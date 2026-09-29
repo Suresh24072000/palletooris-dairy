@@ -1,177 +1,218 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
+import { useState } from "react";
+import {
+  Menu,
+  Search,
+  ShoppingCart,
+  User,
+  X,
+} from "lucide-react";
 
 export default function Header() {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const cartCount = 0;
 
-  const [cartCount, setCartCount] = useState(0);
-
-  // Read cart
-  useEffect(() => {
-
-    const updateCartCount = () => {
-
-      const savedCart = localStorage.getItem("cart");
-
-      if (!savedCart) {
-        setCartCount(0);
-        return;
-      }
-
-      try {
-
-        const cart = JSON.parse(savedCart);
-
-        if (Array.isArray(cart)) {
-          setCartCount(cart.length);
-        } else {
-          setCartCount(0);
-        }
-
-      } catch {
-        setCartCount(0);
-      }
-
-    };
-
-    updateCartCount();
-
-    // Custom event from Add to Cart
-    window.addEventListener(
-      "cartUpdated",
-      updateCartCount
-    );
-
-    return () => {
-      window.removeEventListener(
-        "cartUpdated",
-        updateCartCount
-      );
-    };
-
-  }, []);
+  const closeMenu = () => {
+    setMenuOpen(false);
+  };
 
   return (
-    <>
+    <header className="sticky top-0 z-50 w-full bg-[#fffdf8]">
 
-      {/* TOP ANNOUNCEMENT */}
-      <div className="bg-[#15543f] text-white text-center py-3 font-serif">
-        🌿 &nbsp; Farm fresh dairy delivered to your doorstep
+      {/* ANNOUNCEMENT */}
+      <div className="w-full bg-[#173b27] px-2 py-2 text-center text-[11px] font-medium text-white sm:px-4 sm:text-sm">
+        🌿 Farm fresh dairy delivered to your doorstep
       </div>
 
-      {/* HEADER */}
-      <header className="bg-[#fffdf9] border-b border-gray-200">
+      {/* MAIN HEADER */}
+      <div className="w-full border-b border-black/5 bg-[#fffdf8]">
+        <div className="mx-auto flex h-[82px] w-full items-center px-3 sm:h-20 sm:px-5 lg:max-w-7xl lg:px-8">
 
-        <div className="max-w-[1700px] mx-auto px-6">
+          {/* LOGO */}
+          <a
+            href="#home"
+            onClick={closeMenu}
+            className="flex min-w-0 flex-1 items-center overflow-hidden"
+          >
+            <img
+              src="/logo.png"
+              alt="Palletoori's Dairy Farm"
+              className="block h-auto w-[145px] max-w-full object-contain sm:w-[190px] lg:w-[245px]"
+            />
+          </a>
 
-          <div className="h-[145px] flex items-center">
+          {/* ACTIONS */}
+          <div className="ml-2 flex shrink-0 items-center gap-2">
 
-            {/* LOGO */}
-            <Link
-              href="/"
-              className="flex-shrink-0"
+            {/* SEARCH */}
+            <button
+              type="button"
+              onClick={() => setSearchOpen(!searchOpen)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white shadow-sm sm:h-11 sm:w-11"
+              aria-label="Search"
             >
+              <Search size={19} />
+            </button>
 
-              <Image
-                src="/logo.png"
-                alt="Palletoori's Dairy Farm"
-                width={270}
-                height={140}
-                priority
-                className="w-[270px] h-[140px] object-contain"
-              />
+            {/* USER */}
+            <button
+              type="button"
+              className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white shadow-sm sm:flex sm:h-11 sm:w-11"
+              aria-label="Account"
+            >
+              <User size={19} />
+            </button>
 
-            </Link>
+            {/* CART */}
+            <button
+              type="button"
+              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#173b27] text-white shadow-sm sm:h-11 sm:w-11"
+              aria-label="Cart"
+            >
+              <ShoppingCart size={18} />
 
-            {/* NAVIGATION */}
-            <nav className="flex-1 flex justify-center gap-12 text-lg font-semibold text-[#174936]">
-
-              <Link
-                href="/"
-                className="hover:text-[#b66c28] transition"
-              >
-                Home
-              </Link>
-
-              <Link
-                href="/#products"
-                className="hover:text-[#b66c28] transition"
-              >
-                Products
-              </Link>
-
-              <Link
-                href="/#our-farm"
-                className="hover:text-[#b66c28] transition"
-              >
-                Our Farm
-              </Link>
-
-              <Link
-                href="/#why-us"
-                className="hover:text-[#b66c28] transition"
-              >
-                Why Us
-              </Link>
-
-              <Link
-                href="/#subscriptions"
-                className="hover:text-[#b66c28] transition"
-              >
-                Subscriptions
-              </Link>
-
-            </nav>
-
-            {/* RIGHT ICONS */}
-            <div className="flex items-center gap-5">
-
-              {/* SEARCH */}
-              <button
-                className="w-14 h-14 rounded-full border border-gray-200 bg-white flex items-center justify-center text-2xl hover:bg-gray-50"
-                aria-label="Search"
-              >
-                🔍
-              </button>
-
-              {/* USER */}
-              <button
-                className="w-14 h-14 rounded-full border border-gray-200 bg-white flex items-center justify-center text-2xl hover:bg-gray-50"
-                aria-label="Account"
-              >
-                👤
-              </button>
-
-              {/* CART */}
-              <Link
-                href="/cart"
-                className="h-14 px-6 rounded-full bg-[#15543f] text-white flex items-center gap-3 font-semibold text-lg hover:bg-[#103f30] transition"
-              >
-
-                <span className="text-2xl">
-                  🛒
-                </span>
-
-                <span>
-                  Cart
-                </span>
-
-                <span className="bg-[#d58a3a] text-white min-w-[30px] h-[30px] px-2 rounded-full flex items-center justify-center text-sm font-bold">
+              {cartCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#d88935] px-1 text-[10px] font-bold">
                   {cartCount}
                 </span>
+              )}
+            </button>
 
-              </Link>
-
-            </div>
+            {/* MOBILE MENU */}
+            <button
+              type="button"
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white shadow-sm lg:hidden sm:h-11 sm:w-11"
+              aria-label="Menu"
+            >
+              {menuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
 
           </div>
-
         </div>
+      </div>
 
-      </header>
+      {/* DESKTOP NAV */}
+      <nav className="hidden h-[66px] w-full items-center justify-center gap-8 border-b border-black/10 bg-white lg:flex">
+        <a
+          href="#home"
+          className="font-semibold text-[#173b27] hover:text-[#b77932]"
+        >
+          Home
+        </a>
 
-    </>
+        <a
+          href="#products"
+          className="font-semibold text-gray-600 hover:text-[#173b27]"
+        >
+          Products
+        </a>
+
+        <a
+          href="#about"
+          className="font-semibold text-gray-600 hover:text-[#173b27]"
+        >
+          Our Farm
+        </a>
+
+        <a
+          href="#why-us"
+          className="font-semibold text-gray-600 hover:text-[#173b27]"
+        >
+          Why Us
+        </a>
+
+        <a
+          href="#subscription"
+          className="font-semibold text-gray-600 hover:text-[#173b27]"
+        >
+          Subscriptions
+        </a>
+      </nav>
+
+      {/* SEARCH */}
+      {searchOpen && (
+        <div className="w-full border-b border-black/5 bg-white px-3 py-3">
+          <div className="mx-auto flex w-full max-w-3xl items-center gap-3 rounded-2xl border border-black/10 bg-[#fffdf8] px-4 py-3">
+
+            <Search size={18} className="shrink-0 text-gray-400" />
+
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search milk, curd, butter..."
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+              autoFocus
+            />
+
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="shrink-0"
+                aria-label="Clear search"
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MOBILE MENU */}
+      {menuOpen && (
+        <div className="w-full border-b border-black/5 bg-white px-4 py-4 shadow-lg lg:hidden">
+
+          <nav className="flex flex-col gap-1">
+
+            <a
+              href="#home"
+              onClick={closeMenu}
+              className="rounded-xl px-4 py-3 font-semibold text-[#173b27] hover:bg-[#f3ead9]"
+            >
+              Home
+            </a>
+
+            <a
+              href="#products"
+              onClick={closeMenu}
+              className="rounded-xl px-4 py-3 font-semibold text-[#173b27] hover:bg-[#f3ead9]"
+            >
+              Products
+            </a>
+
+            <a
+              href="#about"
+              onClick={closeMenu}
+              className="rounded-xl px-4 py-3 font-semibold text-[#173b27] hover:bg-[#f3ead9]"
+            >
+              Our Farm
+            </a>
+
+            <a
+              href="#why-us"
+              onClick={closeMenu}
+              className="rounded-xl px-4 py-3 font-semibold text-[#173b27] hover:bg-[#f3ead9]"
+            >
+              Why Us
+            </a>
+
+            <a
+              href="#subscription"
+              onClick={closeMenu}
+              className="rounded-xl px-4 py-3 font-semibold text-[#173b27] hover:bg-[#f3ead9]"
+            >
+              Subscriptions
+            </a>
+
+          </nav>
+        </div>
+      )}
+
+    </header>
   );
 }
