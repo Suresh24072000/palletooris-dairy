@@ -1,355 +1,381 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Image from "next/image";
+import { useState } from "react";
 import Link from "next/link";
-
-type CartItem = {
-  id: number;
-  name: string;
-  price: number;
-  unit: string;
-  image: string;
-  quantity: number;
-};
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
+import { useCart } from "@/lib/context/CartContext";
+import { INITIAL_PRODUCTS } from "@/lib/data/mockData";
+import {
+  Trash2,
+  Plus,
+  Minus,
+  ArrowRight,
+  ShoppingBag,
+  Sparkles,
+  Tag,
+  CheckCircle2,
+  ShieldCheck,
+  Truck,
+} from "lucide-react";
 
 export default function CartPage() {
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const {
+    cart,
+    updateQuantity,
+    updateVariant,
+    removeFromCart,
+    subtotal,
+    deliveryFee,
+    discount,
+    appliedCoupon,
+    applyCoupon,
+    removeCoupon,
+    totalAmount,
+    totalCount,
+    isLoaded,
+  } = useCart();
 
-  useEffect(() => {
-    loadCart();
-    setLoaded(true);
+  const [couponInput, setCouponInput] = useState("");
+  const [couponError, setCouponError] = useState("");
+  const [couponSuccess, setCouponSuccess] = useState("");
 
-    const handleCartUpdate = () => {
-      loadCart();
-    };
+  const handleApplyCoupon = (e: React.FormEvent) => {
+    e.preventDefault();
+    setCouponError("");
+    setCouponSuccess("");
+    if (!couponInput.trim()) return;
 
-    window.addEventListener("cartUpdated", handleCartUpdate);
-
-    return () => {
-      window.removeEventListener("cartUpdated", handleCartUpdate);
-    };
-  }, []);
-
-  const loadCart = () => {
-    const savedCart = localStorage.getItem("cart");
-
-    if (!savedCart) {
-      setCartItems([]);
-      return;
-    }
-
-    try {
-      const cart: CartItem[] = JSON.parse(savedCart);
-
-      /*
-        This also protects old cart data that doesn't have quantity.
-        Old items automatically become quantity 1.
-      */
-      const fixedCart = cart.map((item) => ({
-        ...item,
-        quantity:
-          typeof item.quantity === "number" && item.quantity > 0
-            ? item.quantity
-            : 1,
-      }));
-
-      setCartItems(fixedCart);
-
-      localStorage.setItem("cart", JSON.stringify(fixedCart));
-    } catch {
-      setCartItems([]);
+    const res = applyCoupon(couponInput);
+    if (res.success) {
+      setCouponSuccess(res.message);
+      setCouponInput("");
+    } else {
+      setCouponError(res.message);
     }
   };
 
-  const saveCart = (updatedCart: CartItem[]) => {
-    setCartItems(updatedCart);
-    localStorage.setItem("cart", JSON.stringify(updatedCart));
-
-    window.dispatchEvent(new Event("cartUpdated"));
-  };
-
-  const increaseQuantity = (id: number) => {
-    const updatedCart = cartItems.map((item) =>
-      item.id === id
-        ? {
-            ...item,
-            quantity: item.quantity + 1,
-          }
-        : item
-    );
-
-    saveCart(updatedCart);
-  };
-
-  const decreaseQuantity = (id: number) => {
-    const updatedCart = cartItems
-      .map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              quantity: item.quantity - 1,
-            }
-          : item
-      )
-      .filter((item) => item.quantity > 0);
-
-    saveCart(updatedCart);
-  };
-
-  const removeItem = (id: number) => {
-    const updatedCart = cartItems.filter(
-      (item) => item.id !== id
-    );
-
-    saveCart(updatedCart);
-  };
-
-  const total = cartItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
-    0
-  );
-
-  const totalQuantity = cartItems.reduce(
-    (sum, item) => sum + item.quantity,
-    0
-  );
-
-  if (!loaded) {
+  if (!isLoaded) {
     return (
-      <main className="min-h-screen bg-[#f8fdf8] flex items-center justify-center">
-        <p className="text-lg text-gray-500">
-          Loading cart...
-        </p>
-      </main>
+      <div className="min-h-screen flex flex-col justify-between bg-[#fffdf8]">
+        <Header />
+        <div className="flex-1 flex items-center justify-center p-8">
+          <p className="text-base text-gray-500 font-semibold animate-pulse">
+            Loading your fresh dairy cart...
+          </p>
+        </div>
+        <Footer />
+      </div>
     );
   }
 
+  const freeDeliveryThreshold = 199;
+  const amountToFreeDelivery = freeDeliveryThreshold - subtotal;
+
   return (
-    <main className="min-h-screen bg-[#f8fdf8] text-[#17251d] px-6 py-10">
+    <div className="min-h-screen w-full overflow-x-hidden bg-[#fffdf8] flex flex-col justify-between">
+      <Header />
 
-      <div className="max-w-6xl mx-auto">
-
-        {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-
+      <main className="w-full flex-1 px-4 py-8 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        {/* HEADER BAR */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-
-            <h1 className="text-4xl font-bold">
-              Your Cart
+            <h1 className="text-3xl sm:text-4xl font-black text-[#173b27]">
+              Shopping Cart
             </h1>
-
-            <p className="text-gray-500 mt-2">
-              {totalQuantity}{" "}
-              {totalQuantity === 1 ? "item" : "items"} in your cart
+            <p className="mt-1 text-sm text-[#52665d]">
+              {totalCount} fresh {totalCount === 1 ? "item" : "items"} from Palletoori&apos;s Farm
             </p>
-
           </div>
 
           <Link
-            href="/"
-            className="text-[#0f4b32] font-semibold hover:underline"
+            href="/products"
+            className="inline-flex items-center gap-1.5 text-sm font-bold text-[#126044] hover:underline"
           >
-            ← Continue Shopping
+            &larr; Continue Shopping
           </Link>
-
         </div>
 
-        {/* EMPTY CART */}
-        {cartItems.length === 0 ? (
-
-          <div className="bg-white rounded-3xl p-16 text-center shadow-sm">
-
-            <div className="text-7xl mb-5">
+        {cart.length === 0 ? (
+          /* EMPTY CART VIEW */
+          <div className="rounded-3xl border border-black/5 bg-white p-12 text-center shadow-sm max-w-2xl mx-auto my-12">
+            <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-[#f8efd9] text-4xl mb-4">
               🛒
             </div>
-
-            <h2 className="text-3xl font-bold mb-3">
+            <h2 className="text-2xl font-black text-[#173b27]">
               Your cart is empty
             </h2>
-
-            <p className="text-gray-500 mb-8">
-              Add some fresh products from our farm.
+            <p className="mt-2 text-sm text-[#52665d] max-w-md mx-auto">
+              You haven&apos;t added any farm fresh milk, ghee, or curd yet. Discover pure dairy harvested today.
             </p>
-
-            <Link
-              href="/"
-              className="inline-block bg-[#0f4b32] text-white px-8 py-4 rounded-full font-semibold"
-            >
-              Shop Products
-            </Link>
-
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                href="/products"
+                className="w-full sm:w-auto inline-flex items-center justify-center rounded-full bg-[#126044] px-8 py-3.5 text-sm font-bold text-white shadow hover:bg-[#0e5039]"
+              >
+                Browse Fresh Products
+              </Link>
+              <Link
+                href="/subscriptions"
+                className="w-full sm:w-auto inline-flex items-center justify-center rounded-full border border-[#173b27] px-8 py-3.5 text-sm font-bold text-[#173b27] hover:bg-[#f8efd9]"
+              >
+                Daily Milk Subscription
+              </Link>
+            </div>
           </div>
-
         ) : (
-
-          <div className="grid lg:grid-cols-3 gap-8">
-
-            {/* CART ITEMS */}
-            <div className="lg:col-span-2 space-y-5">
-
-              {cartItems.map((item) => (
-
-                <div
-                  key={item.id}
-                  className="bg-white rounded-3xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center gap-5"
-                >
-
-                  {/* IMAGE */}
-                  <div className="relative w-full sm:w-32 h-32 rounded-2xl overflow-hidden bg-[#f4efe4] flex-shrink-0">
-
-                    <Image
-                      src={item.image}
-                      alt={item.name}
-                      fill
-                      className="object-contain"
-                    />
-
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+            {/* CART ITEMS LIST */}
+            <div className="lg:col-span-2 space-y-4">
+              {/* FREE DELIVERY PROGRESS */}
+              <div className="rounded-2xl border border-black/5 bg-[#f8efd9] p-4 text-xs sm:text-sm">
+                {amountToFreeDelivery > 0 ? (
+                  <div className="flex items-center gap-2 text-[#173b27]">
+                    <Truck size={18} className="text-[#b77932] shrink-0" />
+                    <span>
+                      Add <strong>₹{amountToFreeDelivery}</strong> more to get{" "}
+                      <strong className="text-[#126044]">FREE Morning Delivery</strong>!
+                    </span>
                   </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-[#126044] font-bold">
+                    <CheckCircle2 size={18} />
+                    <span>You unlocked FREE Morning Doorstep Delivery! 🎉</span>
+                  </div>
+                )}
+              </div>
 
-                  {/* DETAILS */}
-                  <div className="flex-1">
+              {cart.map((item) => {
+                // Find all variants for this product to allow inline variant switching
+                const productDef = INITIAL_PRODUCTS.find((p) => p.id === item.productId);
+                const availableVariants = productDef ? productDef.variants : [];
 
-                    <h2 className="text-2xl font-bold">
-                      {item.name}
-                    </h2>
+                return (
+                  <div
+                    key={item.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-3xl border border-black/5 bg-white p-5 shadow-sm transition hover:shadow-md"
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* PRODUCT IMAGE */}
+                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-[#f8efd9] p-2 flex items-center justify-center">
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
 
-                    <p className="text-gray-500 mt-1">
-                      {item.unit}
-                    </p>
+                      {/* INFO */}
+                      <div className="min-w-0">
+                        <h3 className="text-base font-bold text-[#173b27] truncate">
+                          {item.name}
+                        </h3>
 
-                    <p className="text-[#b8752a] font-bold text-xl mt-3">
-                      ₹{item.price} each
-                    </p>
+                        {/* VARIANT SELECTOR INSIDE CART */}
+                        {availableVariants.length > 1 ? (
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className="text-[11px] text-gray-500">Size:</span>
+                            <select
+                              value={item.variantId}
+                              onChange={(e) => {
+                                const newV = availableVariants.find(
+                                  (v) => v.id === e.target.value
+                                );
+                                if (newV) {
+                                  updateVariant(
+                                    item.id,
+                                    newV.id,
+                                    newV.name,
+                                    newV.price,
+                                    newV.unit
+                                  );
+                                }
+                              }}
+                              className="rounded-lg border border-black/10 bg-[#fffdf8] px-2 py-0.5 text-xs font-semibold text-[#173b27] outline-none"
+                            >
+                              {availableVariants.map((v) => (
+                                <option key={v.id} value={v.id}>
+                                  {v.name} (₹{v.price})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-500">{item.variantName}</p>
+                        )}
 
-                    {/* QUANTITY */}
-                    <div className="flex items-center gap-3 mt-4">
-
-                      <button
-                        onClick={() =>
-                          decreaseQuantity(item.id)
-                        }
-                        className="w-9 h-9 rounded-full bg-gray-200 hover:bg-gray-300 font-bold text-xl"
-                      >
-                        −
-                      </button>
-
-                      <span className="w-8 text-center font-bold text-lg">
-                        {item.quantity}
-                      </span>
-
-                      <button
-                        onClick={() =>
-                          increaseQuantity(item.id)
-                        }
-                        className="w-9 h-9 rounded-full bg-[#0f4b32] text-white hover:bg-[#0b3d28] font-bold text-xl"
-                      >
-                        +
-                      </button>
-
+                        <p className="mt-1 text-sm font-bold text-[#c77828]">
+                          ₹{item.price} each
+                        </p>
+                      </div>
                     </div>
 
+                    {/* QUANTITY STEPPER & ITEM TOTAL */}
+                    <div className="flex items-center justify-between sm:justify-end gap-6 pt-2 sm:pt-0 border-t sm:border-t-0 border-black/5">
+                      {/* STEPPER */}
+                      <div className="flex h-10 items-center rounded-full border border-black/10 bg-[#fffdf8] px-2 shadow-sm">
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100"
+                          aria-label="Decrease quantity"
+                        >
+                          <Minus size={14} />
+                        </button>
+                        <span className="w-8 text-center text-sm font-bold text-[#173b27]">
+                          {item.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100"
+                          aria-label="Increase quantity"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      </div>
+
+                      {/* TOTAL & DELETE */}
+                      <div className="text-right min-w-[70px]">
+                        <p className="text-lg font-black text-[#173b27]">
+                          ₹{item.price * item.quantity}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => removeFromCart(item.id)}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 size={12} /> Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="flex justify-between items-center pt-2">
+                <Link
+                  href="/products"
+                  className="text-xs font-bold text-[#126044] hover:underline"
+                >
+                  + Add more dairy products
+                </Link>
+              </div>
+            </div>
+
+            {/* ORDER SUMMARY SIDEBAR */}
+            <div className="space-y-4">
+              <div className="rounded-3xl border border-black/5 bg-white p-6 shadow-sm">
+                <h2 className="text-xl font-black text-[#173b27] mb-4">
+                  Order Summary
+                </h2>
+
+                <div className="space-y-3 text-sm text-[#52665d] border-b border-black/5 pb-4">
+                  <div className="flex justify-between">
+                    <span>Subtotal ({totalCount} items)</span>
+                    <span className="font-bold text-[#173b27]">₹{subtotal}</span>
                   </div>
 
-                  {/* ITEM TOTAL */}
-                  <div className="flex sm:flex-col items-center sm:items-end justify-between gap-4">
-
-                    <p className="text-2xl font-bold">
-                      ₹{item.price * item.quantity}
-                    </p>
-
-                    <button
-                      onClick={() =>
-                        removeItem(item.id)
-                      }
-                      className="text-red-500 hover:text-red-700 font-medium"
-                    >
-                      Remove
-                    </button>
-
+                  <div className="flex justify-between">
+                    <span>Morning Delivery Fee</span>
+                    <span>
+                      {deliveryFee === 0 ? (
+                        <span className="font-bold text-[#126044]">FREE</span>
+                      ) : (
+                        <span className="font-bold text-[#173b27]">₹{deliveryFee}</span>
+                      )}
+                    </span>
                   </div>
 
+                  {discount > 0 && (
+                    <div className="flex justify-between text-[#126044] font-bold">
+                      <span>Coupon Discount ({appliedCoupon})</span>
+                      <span>-₹{discount}</span>
+                    </div>
+                  )}
                 </div>
 
-              ))}
+                {/* COUPON SECTION */}
+                <div className="py-4 border-b border-black/5">
+                  {appliedCoupon ? (
+                    <div className="flex items-center justify-between rounded-2xl bg-emerald-50 p-2.5 text-xs text-emerald-800 border border-emerald-200">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <Tag size={14} /> Coupon applied: {appliedCoupon}
+                      </div>
+                      <button
+                        onClick={removeCoupon}
+                        className="text-xs font-bold text-red-600 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleApplyCoupon} className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={couponInput}
+                          onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                          placeholder="Coupon (e.g. PALLETOORI50)"
+                          className="flex-1 rounded-xl border border-black/10 bg-[#fffdf8] px-3 py-2 text-xs uppercase outline-none focus:border-[#126044]"
+                        />
+                        <button
+                          type="submit"
+                          className="rounded-xl bg-[#173b27] px-4 py-2 text-xs font-bold text-white hover:bg-[#126044]"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                      {couponError && (
+                        <p className="text-[11px] text-red-600">{couponError}</p>
+                      )}
+                      {couponSuccess && (
+                        <p className="text-[11px] text-emerald-600">{couponSuccess}</p>
+                      )}
+                      <p className="text-[10px] text-gray-400">
+                        Use code <strong className="text-gray-600">PALLETOORI50</strong> for ₹50 off on orders ₹200+
+                      </p>
+                    </form>
+                  )}
+                </div>
 
+                {/* TOTAL */}
+                <div className="flex items-baseline justify-between pt-4">
+                  <div>
+                    <span className="text-base font-bold text-[#173b27]">Total Payable</span>
+                    <span className="block text-[11px] text-gray-400">All taxes included</span>
+                  </div>
+                  <span className="text-3xl font-black text-[#c77828]">
+                    ₹{totalAmount}
+                  </span>
+                </div>
+
+                {/* PROCEED TO CHECKOUT BUTTON */}
+                <Link
+                  href="/checkout"
+                  className="mt-6 flex h-14 w-full items-center justify-center gap-2 rounded-full bg-[#126044] px-6 text-base font-bold text-white shadow-lg transition hover:bg-[#0e5039]"
+                >
+                  Proceed to Checkout <ArrowRight size={18} />
+                </Link>
+
+                <p className="mt-3 text-center text-[11px] text-gray-500">
+                  🔒 100% Safe &amp; Secure Payments via Razorpay
+                </p>
+              </div>
+
+              {/* GUARANTEE BADGE */}
+              <div className="rounded-2xl bg-[#f8efd9] p-4 text-xs text-[#52665d] space-y-1">
+                <p className="font-bold text-[#173b27] flex items-center gap-1.5">
+                  <ShieldCheck size={16} className="text-[#126044]" /> Farm Quality Guarantee
+                </p>
+                <p>If you are ever unsatisfied with the freshness or taste of our milk, we replace it or refund with zero questions asked.</p>
+              </div>
             </div>
-
-            {/* ORDER SUMMARY */}
-            <div className="bg-white rounded-3xl p-7 shadow-sm h-fit lg:sticky lg:top-6">
-
-              <h2 className="text-2xl font-bold mb-6">
-                Order Summary
-              </h2>
-
-              <div className="flex justify-between mb-4">
-
-                <span className="text-gray-600">
-                  Items
-                </span>
-
-                <span className="font-semibold">
-                  {totalQuantity}
-                </span>
-
-              </div>
-
-              <div className="flex justify-between mb-4">
-
-                <span className="text-gray-600">
-                  Subtotal
-                </span>
-
-                <span className="font-semibold">
-                  ₹{total}
-                </span>
-
-              </div>
-
-              <div className="flex justify-between mb-5">
-
-                <span className="text-gray-600">
-                  Delivery
-                </span>
-
-                <span className="text-green-700 font-semibold">
-                  Free
-                </span>
-
-              </div>
-
-              <hr className="mb-5" />
-
-              <div className="flex justify-between text-xl font-bold">
-
-                <span>
-                  Total
-                </span>
-
-                <span className="text-[#b8752a]">
-                  ₹{total}
-                </span>
-
-              </div>
-
-              <button
-                onClick={() =>
-                  alert("Checkout coming soon!")
-                }
-                className="w-full mt-7 bg-[#0f4b32] hover:bg-[#0b3d28] text-white py-4 rounded-full font-bold text-lg"
-              >
-                Proceed to Checkout
-              </button>
-
-            </div>
-
           </div>
-
         )}
+      </main>
 
-      </div>
-
-    </main>
+      <Footer />
+    </div>
   );
 }
