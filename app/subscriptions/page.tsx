@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import Image from "next/image";
 import { DairyStore } from "@/lib/db/store";
 import { useAuth } from "@/lib/context/AuthContext";
-import { INITIAL_PRODUCTS, INITIAL_DELIVERY_SLOTS } from "@/lib/data/mockData";
+import { INITIAL_PRODUCTS } from "@/lib/data/mockData";
 import { Subscription, SubscriptionFrequency, Product, ProductVariant } from "@/types/dairy";
 import {
   Calendar,
@@ -14,18 +15,16 @@ import {
   Minus,
   Pause,
   Play,
-  RotateCcw,
   Trash2,
   CheckCircle2,
   Sparkles,
-  ShieldCheck,
-  AlertCircle,
-  Truck,
 } from "lucide-react";
 
 export default function SubscriptionsPage() {
   const { user } = useAuth();
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>(() =>
+    typeof window !== "undefined" ? DairyStore.getSubscriptions() : []
+  );
   const [showBuilder, setShowBuilder] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState("");
 
@@ -34,18 +33,14 @@ export default function SubscriptionsPage() {
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant>(INITIAL_PRODUCTS[0].variants[0]);
   const [quantity, setQuantity] = useState(1);
   const [frequency, setFrequency] = useState<SubscriptionFrequency>("daily");
-  const [customDays, setCustomDays] = useState<string[]>(["Mon", "Wed", "Fri"]);
-  const [selectedSlot, setSelectedSlot] = useState("Morning (6:00 AM – 9:00 AM)");
+  const customDays = ["Mon", "Wed", "Fri"];
+  const selectedSlot = "Morning (6:00 AM \u2013 9:00 AM)";
   const [paymentMode, setPaymentMode] = useState("UPI AutoPay");
 
   const loadSubscriptions = () => {
     const list = DairyStore.getSubscriptions();
     setSubscriptions(list);
   };
-
-  useEffect(() => {
-    loadSubscriptions();
-  }, []);
 
   const handleProductChange = (prodId: string) => {
     const p = INITIAL_PRODUCTS.find((item) => item.id === prodId);
@@ -201,9 +196,11 @@ export default function SubscriptionsPage() {
                             : "border-black/10 bg-[#fffdf8] hover:bg-gray-50"
                         }`}
                       >
-                        <img
+                        <Image
                           src={p.image}
                           alt={p.name}
+                          width={40}
+                          height={40}
                           className="h-10 w-10 rounded-lg object-contain bg-white p-1"
                         />
                         <div className="min-w-0">

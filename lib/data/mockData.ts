@@ -311,6 +311,42 @@ export const INITIAL_PRODUCTS: Product[] = [
       },
     ],
   },
+  {
+    id: "prod-shake-rose",
+    slug: "rose-dry-fruit-milkshake",
+    name: "Rose Dry Fruit Milkshake",
+    category: "Farm Milkshakes",
+    shortDescription: "Chilled farm milk infused with natural rose petals, pistachios, and dry fruits — a celebration in a bottle.",
+    description: "A premium farm shake crafted using cold whole milk, hand-dried rose petals, pistachios, cashews, and raisins. Zero artificial colour or essence. Naturally pink, naturally delicious, and naturally nourishing.",
+    image: "/milk.png",
+    ingredients: "Whole Farm Milk, Rose Petals, Pistachios, Cashews, Raisins, Cane Sugar",
+    shelfLife: "2 days refrigerated",
+    storageInstructions: "Serve chilled. Shake gently before opening.",
+    isFeatured: true,
+    isAvailable: true,
+    variants: [
+      {
+        id: "var-shake-rose-200",
+        productId: "prod-shake-rose",
+        name: "200 ml Bottle",
+        price: 60,
+        originalPrice: 70,
+        stock: 45,
+        isAvailable: true,
+        unit: "ml",
+      },
+      {
+        id: "var-shake-rose-500",
+        productId: "prod-shake-rose",
+        name: "500 ml Bottle",
+        price: 130,
+        originalPrice: 155,
+        stock: 30,
+        isAvailable: true,
+        unit: "ml",
+      },
+    ],
+  },
 ];
 
 export const INITIAL_DELIVERY_SLOTS: DeliverySlot[] = [

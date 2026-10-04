@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
 
 const ADMIN_ROLES = [
   "admin",
@@ -12,7 +12,12 @@ const ADMIN_ROLES = [
 ];
 
 // Routes that require authentication (any logged-in user)
-const PROTECTED_CUSTOMER_ROUTES = ["/profile", "/orders", "/subscriptions", "/checkout"];
+const PROTECTED_CUSTOMER_ROUTES = [
+  "/profile",
+  "/orders",
+  "/subscriptions",
+  "/checkout",
+];
 
 // Routes that require admin role
 const PROTECTED_ADMIN_ROUTES = ["/admin"];
@@ -22,6 +27,11 @@ const ADMIN_LOGIN_PATH = "/admin/login";
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
 
   const isAdminRoute =
     PROTECTED_ADMIN_ROUTES.some((r) => pathname.startsWith(r)) &&
@@ -33,49 +43,73 @@ export async function proxy(request: NextRequest) {
 
   // Only run auth checks on protected routes
   if (!isAdminRoute && !isCustomerRoute) {
-    return NextResponse.next();
+    return response;
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // If Supabase is not configured, allow access in development but warn
-  if (!supabaseUrl || !supabaseServiceKey) {
-    // In development without Supabase, only block admin routes
+  const isConfigured = Boolean(
+    supabaseUrl &&
+      supabaseUrl.trim() !== "" &&
+      supabaseUrl !== "https://placeholder-project.supabase.co" &&
+      !supabaseUrl.includes("your-project") &&
+      supabaseAnonKey &&
+      supabaseAnonKey.trim() !== "" &&
+      supabaseAnonKey !== "placeholder-anon-key" &&
+      !supabaseAnonKey.includes("your-supabase-anon-key")
+  );
+
+  const isDevBypassAllowed =
+    process.env.NODE_ENV !== "production" &&
+    process.env.ALLOW_DEV_ADMIN_BYPASS === "true";
+
+  // If Supabase is not configured:
+  if (!isConfigured) {
     if (isAdminRoute) {
-      // Check for dev admin session cookie
+      if (!isDevBypassAllowed) {
+        // In production or when dev bypass is disabled, NEVER grant access
+        return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
+      }
       const devAdminSession = request.cookies.get("dev_admin_session");
       if (!devAdminSession || devAdminSession.value !== "authenticated") {
         return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
       }
     }
-    return NextResponse.next();
-  }
-
-  // Extract access token from Authorization header or cookies
-  const accessToken =
-    request.cookies.get("sb-access-token")?.value ||
-    request.cookies.get(`sb-${supabaseUrl.split("//")[1]?.split(".")[0]}-auth-token`)?.value ||
-    extractTokenFromCookies(request);
-
-  if (!accessToken) {
-    if (isAdminRoute) {
-      return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
-    }
     if (isCustomerRoute) {
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("next", pathname);
-      return NextResponse.redirect(loginUrl);
+      if (!isDevBypassAllowed) {
+        const loginUrl = new URL("/login", request.url);
+        loginUrl.searchParams.set("next", pathname);
+        return NextResponse.redirect(loginUrl);
+      }
     }
-    return NextResponse.next();
+    return response;
   }
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
+    const supabase = createServerClient(supabaseUrl!, supabaseAnonKey!, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          );
+          response = NextResponse.next({
+            request,
+          });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          );
+        },
+      },
     });
 
-    const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
 
     if (error || !user) {
       if (isAdminRoute) {
@@ -86,7 +120,7 @@ export async function proxy(request: NextRequest) {
         loginUrl.searchParams.set("next", pathname);
         return NextResponse.redirect(loginUrl);
       }
-      return NextResponse.next();
+      return response;
     }
 
     // Check role for admin routes
@@ -99,33 +133,21 @@ export async function proxy(request: NextRequest) {
 
       const role = profile?.role;
       if (!role || !ADMIN_ROLES.includes(role)) {
-        // Authenticated but not an admin — redirect to home
-        return NextResponse.redirect(new URL("/", request.url));
+        // Authenticated customer/user but not an authorized admin
+        const deniedUrl = new URL(ADMIN_LOGIN_PATH, request.url);
+        deniedUrl.searchParams.set("error", "access_denied");
+        return NextResponse.redirect(deniedUrl);
       }
     }
 
-    return NextResponse.next();
-  } catch {
+    return response;
+  } catch (err) {
+    console.error("Auth proxy error:", err);
     if (isAdminRoute) {
       return NextResponse.redirect(new URL(ADMIN_LOGIN_PATH, request.url));
     }
-    return NextResponse.next();
+    return response;
   }
-}
-
-function extractTokenFromCookies(request: NextRequest): string | null {
-  // Supabase stores auth in cookies named like: sb-<project-ref>-auth-token
-  for (const cookie of request.cookies.getAll()) {
-    if (cookie.name.startsWith("sb-") && cookie.name.endsWith("-auth-token")) {
-      try {
-        const parsed = JSON.parse(decodeURIComponent(cookie.value));
-        return parsed?.access_token || parsed?.[0] || null;
-      } catch {
-        return cookie.value || null;
-      }
-    }
-  }
-  return null;
 }
 
 export const config = {

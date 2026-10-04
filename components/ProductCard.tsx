@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Plus, Minus, ShoppingCart, Check, Sparkles } from "lucide-react";
 import { Product, ProductVariant } from "@/types/dairy";
 import { useCart } from "@/lib/context/CartContext";
@@ -75,11 +76,12 @@ export default function ProductCard({ product }: { product: Product }) {
           href={`/products/${product.slug}`}
           className="relative block h-[210px] w-full overflow-hidden rounded-2xl bg-[#f8efd9] transition-transform duration-300 group-hover:scale-[1.02]"
         >
-          <img
+          <Image
             src={product.image}
             alt={product.name}
+            width={400}
+            height={210}
             className="h-full w-full object-contain p-4 transition-transform duration-300 group-hover:scale-105"
-            loading="lazy"
           />
         </Link>
 

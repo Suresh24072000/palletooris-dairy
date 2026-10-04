@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useCart } from "@/lib/context/CartContext";
@@ -11,8 +12,6 @@ import {
   Plus,
   Minus,
   ArrowRight,
-  ShoppingBag,
-  Sparkles,
   Tag,
   CheckCircle2,
   ShieldCheck,
@@ -158,9 +157,11 @@ export default function CartPage() {
                     <div className="flex items-center gap-4">
                       {/* PRODUCT IMAGE */}
                       <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-[#f8efd9] p-2 flex items-center justify-center">
-                        <img
+                        <Image
                           src={item.image}
                           alt={item.name}
+                          width={80}
+                          height={80}
                           className="h-full w-full object-contain"
                         />
                       </div>

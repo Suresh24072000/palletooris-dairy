@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ShieldCheck, Truck, Clock, Sparkles, Phone, Mail, MapPin } from "lucide-react";
 
 export default function Footer() {
@@ -55,9 +56,11 @@ export default function Footer() {
           {/* BRAND COLUMN */}
           <div className="lg:col-span-2 space-y-4">
             <Link href="/" className="inline-block">
-              <img
+              <Image
                 src="/logo.png"
                 alt="Palletoori's Dairy Farm"
+                width={210}
+                height={60}
                 className="h-auto w-[210px] object-contain"
               />
             </Link>

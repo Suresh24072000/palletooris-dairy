@@ -5,8 +5,8 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import ProductCard from "@/components/ProductCard";
-import { INITIAL_PRODUCTS, INITIAL_CATEGORIES } from "@/lib/data/mockData";
-import { Sparkles, ShieldCheck, HeartHandshake, CheckCircle2, ArrowRight, Milk, Award, Droplets } from "lucide-react";
+import { INITIAL_PRODUCTS } from "@/lib/data/mockData";
+import { Sparkles, CheckCircle2, ArrowRight, Droplets } from "lucide-react";
 
 export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");

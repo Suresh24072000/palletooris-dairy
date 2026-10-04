@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Phone, Mail, MapPin, Clock, MessageSquare, CheckCircle2, Send } from "lucide-react";
+import { Phone, MapPin, Clock, CheckCircle2, Send } from "lucide-react";
 
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);

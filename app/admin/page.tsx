@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import { DairyStore } from "@/lib/db/store";
 import {
   Product,
@@ -10,7 +13,6 @@ import {
   DeliveryTask,
   OrderStatus,
   DeliveryStatus,
-  ProductVariant,
 } from "@/types/dairy";
 import {
   LayoutDashboard,
@@ -21,20 +23,16 @@ import {
   Users,
   Calendar,
   BarChart3,
-  LogOut,
   Plus,
   Edit,
   Trash2,
   CheckCircle2,
   AlertTriangle,
-  Clock,
-  Search,
-  ChevronDown,
-  ArrowUpRight,
   TrendingUp,
   Menu,
   X,
   ExternalLink,
+  LogOut,
 } from "lucide-react";
 
 type AdminTab =
@@ -48,14 +46,35 @@ type AdminTab =
   | "analytics";
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
-  // Data states
-  const [products, setProducts] = useState<Product[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [deliveries, setDeliveries] = useState<DeliveryTask[]>([]);
+  const handleAdminLogout = async () => {
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.warn("Logout error:", err);
+      }
+    }
+    document.cookie = "dev_admin_session=; path=/; max-age=0";
+    router.push("/admin/login");
+  };
+
+  // Data states with lazy initializers
+  const [products, setProducts] = useState<Product[]>(() =>
+    typeof window !== "undefined" ? DairyStore.getProducts() : []
+  );
+  const [orders, setOrders] = useState<Order[]>(() =>
+    typeof window !== "undefined" ? DairyStore.getOrders() : []
+  );
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>(() =>
+    typeof window !== "undefined" ? DairyStore.getSubscriptions() : []
+  );
+  const [deliveries, setDeliveries] = useState<DeliveryTask[]>(() =>
+    typeof window !== "undefined" ? DairyStore.getDeliveries() : []
+  );
   const [feedback, setFeedback] = useState("");
 
   // Product modal state
@@ -82,10 +101,6 @@ export default function AdminDashboardPage() {
     setSubscriptions(DairyStore.getSubscriptions());
     setDeliveries(DairyStore.getDeliveries());
   };
-
-  useEffect(() => {
-    loadData();
-  }, []);
 
   const showNotification = (msg: string) => {
     setFeedback(msg);
@@ -246,9 +261,11 @@ export default function AdminDashboardPage() {
           {/* LOGO */}
           <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
             <Link href="/" className="flex items-center gap-2">
-              <img
+              <Image
                 src="/logo.png"
                 alt="Palletoori's"
+                width={100}
+                height={40}
                 className="h-10 w-auto object-contain brightness-0 invert"
               />
             </Link>
@@ -316,6 +333,15 @@ export default function AdminDashboardPage() {
               <ExternalLink size={14} /> View Live Store
             </span>
           </Link>
+          <button
+            type="button"
+            onClick={handleAdminLogout}
+            className="flex w-full items-center justify-between rounded-xl bg-red-500/20 px-3.5 py-2 text-xs font-semibold text-red-200 hover:bg-red-500/30 transition"
+          >
+            <span className="flex items-center gap-2">
+              <LogOut size={14} /> Sign Out
+            </span>
+          </button>
           <div className="px-3 text-[10px] text-white/50">
             Palletoori&apos;s Operations v2.0
           </div>
@@ -347,6 +373,15 @@ export default function AdminDashboardPage() {
             <span className="rounded-full bg-[#f8efd9] px-3 py-1 text-xs font-bold text-[#173b27]">
               Farm Manager Mode
             </span>
+            <button
+              type="button"
+              onClick={handleAdminLogout}
+              className="inline-flex items-center gap-1.5 rounded-full border border-black/10 px-3 py-1 text-xs font-bold text-red-700 hover:bg-red-50 transition"
+              title="Sign out of Admin Portal"
+            >
+              <LogOut size={13} />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
           </div>
         </header>
 
@@ -735,9 +770,11 @@ export default function AdminDashboardPage() {
                     <div>
                       <div className="flex items-start justify-between gap-3">
                         <div className="h-20 w-20 rounded-2xl bg-[#f8efd9] p-2 flex items-center justify-center shrink-0">
-                          <img
+                          <Image
                             src={prod.image}
                             alt={prod.name}
+                            width={80}
+                            height={80}
                             className="h-full w-full object-contain"
                           />
                         </div>

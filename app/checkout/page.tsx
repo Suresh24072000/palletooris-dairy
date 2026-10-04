@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Script from "next/script";
@@ -12,13 +12,11 @@ import { DairyStore } from "@/lib/db/store";
 import { Address, DeliverySlot, Order, PaymentMethod } from "@/types/dairy";
 import {
   Check,
-  ChevronRight,
   MapPin,
   Clock,
   CreditCard,
   ShieldCheck,
   AlertCircle,
-  Truck,
   Plus,
 } from "lucide-react";
 
@@ -32,20 +30,44 @@ declare global {
 export default function CheckoutPage() {
   const router = useRouter();
   const { cart, subtotal, deliveryFee, discount, appliedCoupon, totalAmount, clearCart, isLoaded } = useCart();
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
 
   const [step, setStep] = useState<number>(1);
-  const [deliverySlots, setDeliverySlots] = useState<DeliverySlot[]>([]);
+  const [deliverySlots] = useState<DeliverySlot[]>(() =>
+    typeof window !== "undefined" ? DairyStore.getDeliverySlots() : []
+  );
 
-  // Step 1: Customer Info
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+  // Step 1: Customer Info — lazily initialized from user or DairyStore defaults
+  const [fullName, setFullName] = useState(() => {
+    if (user) return user.fullName || "";
+    if (typeof window !== "undefined") return DairyStore.getUser().fullName;
+    return "";
+  });
+  const [phone, setPhone] = useState(() => {
+    if (user) return user.phone || "";
+    if (typeof window !== "undefined") return DairyStore.getUser().phone;
+    return "";
+  });
+  const [email, setEmail] = useState(() => {
+    if (user) return user.email || "";
+    if (typeof window !== "undefined") return DairyStore.getUser().email || "";
+    return "";
+  });
 
-  // Step 2: Address
-  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
-  const [selectedAddressId, setSelectedAddressId] = useState<string>("");
-  const [isAddingNewAddress, setIsAddingNewAddress] = useState(false);
+  // Step 2: Address — lazily initialized
+  const [savedAddresses] = useState<Address[]>(() => {
+    if (user) return user.addresses || [];
+    if (typeof window !== "undefined") return DairyStore.getUser().addresses;
+    return [];
+  });
+  const [selectedAddressId, setSelectedAddressId] = useState<string>(() => {
+    const addresses = user?.addresses ?? (typeof window !== "undefined" ? DairyStore.getUser().addresses : []);
+    return addresses.length > 0 ? addresses[0].id : "";
+  });
+  const [isAddingNewAddress, setIsAddingNewAddress] = useState<boolean>(() => {
+    const addresses = user?.addresses ?? (typeof window !== "undefined" ? DairyStore.getUser().addresses : []);
+    return addresses.length === 0;
+  });
   const [newAddress, setNewAddress] = useState<Omit<Address, "id">>({
     fullName: "",
     phone: "",
@@ -60,7 +82,7 @@ export default function CheckoutPage() {
   });
 
   // Step 3: Slot
-  const [selectedSlot, setSelectedSlot] = useState<string>("Morning (6:00 AM – 9:00 AM)");
+  const [selectedSlot, setSelectedSlot] = useState<string>("Morning (6:00 AM \u2013 9:00 AM)");
   const [deliveryDate, setDeliveryDate] = useState<string>("Tomorrow Morning");
 
   // Step 5: Payment
@@ -68,37 +90,6 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Initialize data
-  useEffect(() => {
-    const slots = DairyStore.getDeliverySlots();
-    setDeliverySlots(slots);
-    if (slots.length > 0) {
-      setSelectedSlot(`${slots[0].title} (${slots[0].timeRange})`);
-    }
-
-    if (user) {
-      setFullName(user.fullName || "");
-      setPhone(user.phone || "");
-      setEmail(user.email || "");
-      setSavedAddresses(user.addresses || []);
-      if (user.addresses && user.addresses.length > 0) {
-        setSelectedAddressId(user.addresses[0].id);
-      } else {
-        setIsAddingNewAddress(true);
-      }
-    } else {
-      const defaultUser = DairyStore.getUser();
-      setFullName(defaultUser.fullName);
-      setPhone(defaultUser.phone);
-      setEmail(defaultUser.email || "");
-      setSavedAddresses(defaultUser.addresses);
-      if (defaultUser.addresses.length > 0) {
-        setSelectedAddressId(defaultUser.addresses[0].id);
-      } else {
-        setIsAddingNewAddress(true);
-      }
-    }
-  }, [user]);
 
   if (!isLoaded) {
     return (
@@ -134,7 +125,7 @@ export default function CheckoutPage() {
   const activeAddress: Address = isAddingNewAddress
     ? {
         ...newAddress,
-        id: `addr-${Date.now()}`,
+        id: "new-address-entry",
         fullName: newAddress.fullName || fullName,
         phone: newAddress.phone || phone,
       }
@@ -155,18 +146,28 @@ export default function CheckoutPage() {
     setErrorMessage("");
 
     try {
-      const orderNumber = `PDF-${Math.floor(10000 + Math.random() * 90000)}`;
-      const orderId = `ord-${Date.now()}`;
+      // Generate unique order identifiers inside the async handler (not during render)
+      const generateOrderNumber = () => `PDF-${Math.floor(10000 + Math.random() * 90000)}`;
+      const generateOrderId = () => `ord-${Date.now()}`;
+      const orderNumber = generateOrderNumber();
+      const orderId = generateOrderId();
 
       // 1. If Online Payment via Razorpay
       if (paymentMethod === "online") {
-        // Call order creation API
+        // Call order creation API with validated items
         const createRes = await fetch("/api/razorpay/create-order", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             amount: totalAmount,
             receipt: orderNumber,
+            items: cart.map((i) => ({
+              productId: i.productId,
+              variantId: i.variantId,
+              quantity: i.quantity,
+              price: i.price,
+            })),
+            couponCode: appliedCoupon || undefined,
             notes: {
               customer_name: fullName,
               phone: phone,
@@ -181,8 +182,8 @@ export default function CheckoutPage() {
           throw new Error(orderData.error || "Unable to initiate payment");
         }
 
-        // Check if Razorpay SDK script is loaded and configured
-        if (typeof window !== "undefined" && window.Razorpay && !orderData.isMock) {
+        // Check if Razorpay SDK script is loaded
+        if (typeof window !== "undefined" && window.Razorpay) {
           const options = {
             key: orderData.key,
             amount: orderData.amount,
@@ -200,14 +201,18 @@ export default function CheckoutPage() {
               const verifyRes = await fetch("/api/razorpay/verify-payment", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(response),
+                body: JSON.stringify({
+                  ...response,
+                  orderId,
+                  userId: user?.id,
+                }),
               });
 
               const verifyData = await verifyRes.json();
               if (verifyData.success) {
                 completeOrderCreation(orderId, orderNumber, "paid", response.razorpay_payment_id);
               } else {
-                setErrorMessage("Payment verification failed. Please contact support.");
+                setErrorMessage(verifyData.error || "Payment verification failed. Please contact support.");
                 setIsProcessing(false);
               }
             },
@@ -228,15 +233,8 @@ export default function CheckoutPage() {
           });
           rzp.open();
         } else {
-          // Development / Test simulation mode
-          setTimeout(() => {
-            completeOrderCreation(
-              orderId,
-              orderNumber,
-              "paid",
-              `pay_mock_${Date.now()}`
-            );
-          }, 1200);
+          setErrorMessage("Razorpay payment checkout is unavailable. Please check your connection or choose Cash on Delivery.");
+          setIsProcessing(false);
         }
       } else {
         // Cash on Delivery (COD)

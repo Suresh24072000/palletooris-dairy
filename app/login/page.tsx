@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/lib/context/AuthContext";
-import { Phone, ShieldCheck, ArrowRight, Sparkles, AlertCircle } from "lucide-react";
+import { ArrowRight, AlertCircle } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = searchParams.get("next");
   const { sendOtp, verifyOtp } = useAuth();
 
   const [step, setStep] = useState<"phone" | "otp">("phone");
@@ -55,7 +57,7 @@ export default function LoginPage() {
     setLoading(false);
 
     if (res.success) {
-      router.push("/profile");
+      router.push(nextParam || "/profile");
     } else {
       setErrorMsg(res.message);
     }
@@ -195,3 +197,18 @@ export default function LoginPage() {
     </div>
   );
 }
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#fffdf8] flex items-center justify-center">
+          <p className="text-gray-500 font-bold animate-pulse">Loading login...</p>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
+  );
+}
+

@@ -13,13 +13,9 @@ import {
   Phone,
   Mail,
   MapPin,
-  Package,
-  Calendar,
-  CreditCard,
   LogOut,
   Plus,
   Trash2,
-  CheckCircle2,
 } from "lucide-react";
 
 export default function ProfilePage() {

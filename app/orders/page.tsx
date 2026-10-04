@@ -1,22 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { DairyStore } from "@/lib/db/store";
 import { Order } from "@/types/dairy";
-import { Package, ChevronRight, Clock, ArrowRight, Truck } from "lucide-react";
+import { Package } from "lucide-react";
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const list = DairyStore.getOrders();
-    setOrders(list);
-    setLoading(false);
-  }, []);
+  const [orders] = useState<Order[]>(() =>
+    typeof window !== "undefined" ? DairyStore.getOrders() : []
+  );
+  const loading = false;
 
   const getStatusBadge = (status: Order["orderStatus"]) => {
     switch (status) {

@@ -4,7 +4,17 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase/client";
-import { ShieldCheck, Phone, ArrowRight, AlertCircle, Eye, EyeOff, Lock } from "lucide-react";
+import { ShieldCheck, Phone, ArrowRight, AlertCircle, Eye, EyeOff, Lock, CheckCircle2 } from "lucide-react";
+
+const ADMIN_ROLES = [
+  "admin",
+  "super_admin",
+  "farm_manager",
+  "operations",
+  "delivery_manager",
+  "inventory_manager",
+  "support",
+];
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -14,60 +24,114 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("error") === "access_denied") {
+        return "Access Denied: Your account does not have administrator privileges.";
+      }
+    }
+    return "";
+  });
   const [infoMsg, setInfoMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loginMode, setLoginMode] = useState<"phone" | "email">("phone");
+  const [countdown, setCountdown] = useState(0);
 
-  // Check if already logged in as admin
+  const isDevBypassEnabled =
+    process.env.NODE_ENV !== "production" &&
+    process.env.NEXT_PUBLIC_ALLOW_DEV_ADMIN_BYPASS === "true";
+
+  // Countdown timer for OTP resend
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
 
-        const adminRoles = ["admin", "super_admin", "farm_manager", "operations", "delivery_manager", "inventory_manager", "support"];
-        if (profile?.role && adminRoles.includes(profile.role)) {
+  // Check session
+  useEffect(() => {
+
+    const checkSession = async () => {
+      if (!isSupabaseConfigured()) {
+        if (!isDevBypassEnabled) return;
+        const hasDevCookie = document.cookie
+          .split("; ")
+          .some((c) => c.startsWith("dev_admin_session=authenticated"));
+        if (hasDevCookie) {
           router.replace("/admin");
         }
+        return;
+      }
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", session.user.id)
+            .single();
+
+          if (profile?.role && ADMIN_ROLES.includes(profile.role)) {
+            router.replace("/admin");
+          }
+        }
+      } catch (err) {
+        console.warn("Session check error:", err);
       }
     };
     checkSession();
-  }, [router]);
+  }, [router, isDevBypassEnabled]);
+
+  const setAdminCookie = () => {
+    document.cookie = "dev_admin_session=authenticated; path=/; max-age=86400; SameSite=Lax";
+  };
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
     setInfoMsg("");
 
-    if (!phone || phone.trim().length < 10) {
+    const cleanPhone = phone.trim().replace(/\D/g, "").slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
       setErrorMsg("Please enter a valid 10-digit mobile number.");
       return;
     }
 
     if (!isSupabaseConfigured()) {
-      setErrorMsg("Admin authentication requires Supabase configuration. Please set up environment variables.");
+      if (!isDevBypassEnabled) {
+        setErrorMsg("Supabase is not configured. Live credentials must be set in environment variables to send SMS OTP.");
+        return;
+      }
+      setInfoMsg(`Local Development Mode: SMS simulation active for +91 ${cleanPhone}. Enter code 123456 below.`);
+      setStep("otp");
+      setCountdown(30);
       return;
     }
 
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({
-        phone: `+91${phone.slice(-10)}`,
+        phone: `+91${cleanPhone}`,
       });
 
       if (error) {
-        setErrorMsg(error.message || "Failed to send OTP. Please try again.");
+        if (error.message.toLowerCase().includes("sms provider") || error.message.toLowerCase().includes("not configured")) {
+          setErrorMsg("Supabase SMS provider not yet configured in project dashboard (Twilio/MessageBird required). Please configure in Supabase Auth Settings or use Email/Password login.");
+        } else if (error.message.toLowerCase().includes("rate limit") || error.message.toLowerCase().includes("too many")) {
+          setErrorMsg("Rate limit reached for OTP. Please wait 5 minutes before trying again.");
+        } else {
+          setErrorMsg(error.message || "Failed to send OTP. Please try again.");
+        }
       } else {
-        setInfoMsg(`OTP sent to +91 ${phone.slice(-10)}`);
+        setInfoMsg(`OTP sent successfully to +91 ${cleanPhone}`);
         setStep("otp");
+        setCountdown(30);
       }
     } catch {
-      setErrorMsg("An unexpected error occurred. Please try again.");
+      setErrorMsg("Network error occurred while sending OTP. Please check your connection.");
     } finally {
       setLoading(false);
     }
@@ -82,36 +146,55 @@ export default function AdminLoginPage() {
       return;
     }
 
+    const cleanPhone = phone.trim().replace(/\D/g, "").slice(-10);
+
+    // Development fallback
+    if (!isSupabaseConfigured()) {
+      if (!isDevBypassEnabled) {
+        setErrorMsg("Supabase is not configured. Live credentials are required.");
+        return;
+      }
+      if (otp.trim() === "123456") {
+        setAdminCookie();
+        router.push("/admin");
+        return;
+      }
+      setErrorMsg("Invalid dev code. Use 123456 in development test mode.");
+      return;
+    }
+
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.verifyOtp({
-        phone: `+91${phone.slice(-10)}`,
-        token: otp,
+        phone: `+91${cleanPhone}`,
+        token: otp.trim(),
         type: "sms",
       });
 
       if (error || !data.user) {
-        setErrorMsg(error?.message || "Invalid or expired OTP.");
+        setErrorMsg(error?.message || "Invalid or expired OTP code.");
         setLoading(false);
         return;
       }
 
-      // Check admin role server-side
-      const { data: profile } = await supabase
+      // Check admin authorization from profiles table
+      const { data: profile, error: profError } = await supabase
         .from("profiles")
         .select("role, full_name")
         .eq("id", data.user.id)
         .single();
 
-      const adminRoles = ["admin", "super_admin", "farm_manager", "operations", "delivery_manager", "inventory_manager", "support"];
-      if (!profile?.role || !adminRoles.includes(profile.role)) {
+      if (profError || !profile?.role || !ADMIN_ROLES.includes(profile.role)) {
         await supabase.auth.signOut();
-        setErrorMsg("Access denied. You do not have admin privileges.");
+        setErrorMsg(
+          `Access Denied: +91 ${cleanPhone} is not registered with administrative privileges. Contact the administrator.`
+        );
         setStep("phone");
         setLoading(false);
         return;
       }
 
+      setAdminCookie();
       router.push("/admin");
     } catch {
       setErrorMsg("Verification failed. Please try again.");
@@ -129,45 +212,64 @@ export default function AdminLoginPage() {
       return;
     }
 
+    // Development fallback
     if (!isSupabaseConfigured()) {
-      setErrorMsg("Admin authentication requires Supabase configuration.");
+      if (!isDevBypassEnabled) {
+        setErrorMsg("Supabase is not configured. Live credentials must be set in environment variables to authenticate.");
+        return;
+      }
+      if (email.toLowerCase().includes("admin") || password === "admin123") {
+        setAdminCookie();
+        router.push("/admin");
+        return;
+      }
+      setErrorMsg("Dev mode: enter admin@palletoorisdairy.com and password admin123.");
       return;
     }
 
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password,
       });
 
       if (error || !data.user) {
-        setErrorMsg(error?.message || "Invalid credentials.");
+        setErrorMsg(error?.message || "Invalid admin credentials.");
         setLoading(false);
         return;
       }
 
-      // Check admin role
+      // Verify admin role
       const { data: profile } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", data.user.id)
         .single();
 
-      const adminRoles = ["admin", "super_admin", "farm_manager", "operations", "delivery_manager", "inventory_manager", "support"];
-      if (!profile?.role || !adminRoles.includes(profile.role)) {
+      if (!profile?.role || !ADMIN_ROLES.includes(profile.role)) {
         await supabase.auth.signOut();
-        setErrorMsg("Access denied. You do not have admin privileges.");
+        setErrorMsg("Access Denied: You do not have administrator authorization.");
         setLoading(false);
         return;
       }
 
+      setAdminCookie();
       router.push("/admin");
     } catch {
-      setErrorMsg("Login failed. Please try again.");
+      setErrorMsg("Login failed. Please verify your credentials and try again.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDevBypass = () => {
+    if (!isDevBypassEnabled) {
+      setErrorMsg("Development admin bypass is disabled in this environment.");
+      return;
+    }
+    setAdminCookie();
+    router.push("/admin");
   };
 
   return (
@@ -186,7 +288,12 @@ export default function AdminLoginPage() {
           {/* Login Mode Toggle */}
           <div className="flex gap-2 mb-6 p-1 bg-white/10 rounded-xl">
             <button
-              onClick={() => { setLoginMode("phone"); setStep("phone"); setErrorMsg(""); }}
+              type="button"
+              onClick={() => {
+                setLoginMode("phone");
+                setStep("phone");
+                setErrorMsg("");
+              }}
               className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition ${
                 loginMode === "phone"
                   ? "bg-white text-[#173b27] shadow"
@@ -196,7 +303,11 @@ export default function AdminLoginPage() {
               <Phone size={14} /> Phone OTP
             </button>
             <button
-              onClick={() => { setLoginMode("email"); setErrorMsg(""); }}
+              type="button"
+              onClick={() => {
+                setLoginMode("email");
+                setErrorMsg("");
+              }}
               className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition ${
                 loginMode === "email"
                   ? "bg-white text-[#173b27] shadow"
@@ -208,21 +319,43 @@ export default function AdminLoginPage() {
           </div>
 
           {!isSupabaseConfigured() && (
-            <div className="mb-4 rounded-xl bg-amber-500/20 border border-amber-400/30 p-3 text-xs text-amber-200">
-              ⚠️ Supabase not configured. Set <code className="font-mono">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to enable authentication.
+            <div className="mb-4 rounded-xl bg-amber-500/15 border border-amber-400/30 p-3.5 text-xs text-amber-200">
+              <div className="flex items-start gap-2">
+                <AlertCircle size={15} className="shrink-0 text-amber-400 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-100">
+                    {isDevBypassEnabled ? "Local Development Environment" : "Supabase Auth Configuration Required"}
+                  </p>
+                  <p className="mt-0.5 text-amber-200/80">
+                    {isDevBypassEnabled
+                      ? "Live Supabase credentials not set in .env.local. Test with dev code 123456 or click below."
+                      : "Supabase credentials are not configured in environment variables. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to enable live authentication."}
+                  </p>
+                  {isDevBypassEnabled && (
+                    <button
+                      type="button"
+                      onClick={handleDevBypass}
+                      className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-amber-400/20 px-3 py-1.5 text-[11px] font-bold text-amber-100 hover:bg-amber-400/30 border border-amber-400/40"
+                    >
+                      Enter Dev Admin Mode &rarr;
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
           {errorMsg && (
             <div className="mb-4 rounded-xl bg-red-500/20 p-3 text-xs text-red-300 border border-red-400/30 flex items-center gap-2">
-              <AlertCircle size={14} className="shrink-0" />
+              <AlertCircle size={15} className="shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           {infoMsg && (
-            <div className="mb-4 rounded-xl bg-emerald-500/20 p-3 text-xs text-emerald-300 border border-emerald-400/30">
-              {infoMsg}
+            <div className="mb-4 rounded-xl bg-emerald-500/20 p-3 text-xs text-emerald-300 border border-emerald-400/30 flex items-center gap-2">
+              <CheckCircle2 size={15} className="shrink-0" />
+              <span>{infoMsg}</span>
             </div>
           )}
 
@@ -253,7 +386,7 @@ export default function AdminLoginPage() {
                     disabled={loading}
                     className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#c77828] text-sm font-bold text-white shadow-md transition hover:bg-[#b86e22] disabled:opacity-50"
                   >
-                    {loading ? "Sending..." : "Send Admin OTP"} <ArrowRight size={16} />
+                    {loading ? "Sending OTP..." : "Send Admin OTP"} <ArrowRight size={16} />
                   </button>
                 </form>
               )}
@@ -273,6 +406,11 @@ export default function AdminLoginPage() {
                       required
                       value={otp}
                       onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                      onPaste={(e) => {
+                        e.preventDefault();
+                        const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+                        if (pasted) setOtp(pasted);
+                      }}
                       placeholder="000000"
                       className="w-full rounded-2xl border border-white/20 bg-white/10 p-3 text-center text-xl font-black tracking-widest text-white outline-none focus:border-[#c77828] placeholder:text-white/20"
                       autoFocus
@@ -290,7 +428,10 @@ export default function AdminLoginPage() {
                   <div className="flex items-center justify-between text-xs pt-1">
                     <button
                       type="button"
-                      onClick={() => { setStep("phone"); setOtp(""); }}
+                      onClick={() => {
+                        setStep("phone");
+                        setOtp("");
+                      }}
                       className="text-white/50 hover:text-white font-semibold"
                     >
                       Change number
@@ -298,10 +439,10 @@ export default function AdminLoginPage() {
                     <button
                       type="button"
                       onClick={handleSendOtp}
-                      disabled={loading}
-                      className="text-[#c77828] font-bold hover:underline disabled:opacity-50"
+                      disabled={loading || countdown > 0}
+                      className="text-[#c77828] font-bold hover:underline disabled:opacity-50 disabled:no-underline"
                     >
-                      Resend OTP
+                      {countdown > 0 ? `Resend OTP in ${countdown}s` : "Resend OTP"}
                     </button>
                   </div>
                 </form>
@@ -360,13 +501,13 @@ export default function AdminLoginPage() {
               href="/"
               className="text-[11px] text-white/40 hover:text-white/70"
             >
-              ← Back to Store
+              &larr; Back to Store
             </Link>
           </div>
         </div>
 
         <p className="text-center text-xs text-white/30 mt-6">
-          🔒 This portal is for authorized personnel only. All access is logged and monitored.
+          🔒 Authorized farm operations personnel only. Access is verified against administrator roles.
         </p>
       </div>
     </div>

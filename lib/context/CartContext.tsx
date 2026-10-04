@@ -30,19 +30,14 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
-
-  // Load from localStorage on mount
-  useEffect(() => {
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    if (typeof window === "undefined") return [];
     try {
       const stored = localStorage.getItem("cart");
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          // Normalize items
-          const normalized: CartItem[] = parsed.map((item) => ({
+          return parsed.map((item) => ({
             id: item.id ? String(item.id) : `${item.productId || item.name}-${item.variantId || "default"}`,
             productId: item.productId || String(item.id || item.name),
             variantId: item.variantId || "default",
@@ -53,14 +48,33 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             quantity: Number(item.quantity) > 0 ? Number(item.quantity) : 1,
             unit: item.unit || "unit",
           }));
-          setCart(normalized);
         }
       }
     } catch (e) {
       console.error("Failed to load cart", e);
-    } finally {
-      setIsLoaded(true);
     }
+    return [];
+  });
+  const isLoaded = true;
+  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleCartSync = () => {
+      try {
+        const stored = localStorage.getItem("cart");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) {
+            setCart(parsed);
+          }
+        }
+      } catch (e) {
+        console.error("Sync error", e);
+      }
+    };
+
+    window.addEventListener("cartUpdated", handleCartSync);
+    return () => window.removeEventListener("cartUpdated", handleCartSync);
   }, []);
 
   // Save to localStorage whenever cart changes

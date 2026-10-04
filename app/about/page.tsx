@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { Sparkles, CheckCircle2, ShieldCheck, Heart, Award, ArrowRight } from "lucide-react";
+import { Sparkles, ArrowRight } from "lucide-react";
 
 export default function AboutPage() {
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -9,14 +9,10 @@ import { DairyStore } from "@/lib/db/store";
 import { Order } from "@/types/dairy";
 import {
   CheckCircle2,
-  Package,
   Calendar,
   Clock,
-  MapPin,
   Phone,
-  ArrowRight,
   Download,
-  Share2,
 } from "lucide-react";
 
 export default function OrderDetailsPage({
@@ -25,16 +21,10 @@ export default function OrderDetailsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const found = DairyStore.getOrderById(id);
-    if (found) {
-      setOrder(found);
-    }
-    setLoading(false);
-  }, [id]);
+  const [order] = useState<Order | null>(() =>
+    typeof window !== "undefined" ? DairyStore.getOrderById(id) || null : null
+  );
+  const loading = false;
 
   if (loading) {
     return (

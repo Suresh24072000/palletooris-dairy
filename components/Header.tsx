@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Menu,
@@ -31,29 +32,20 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [searchResults, setSearchResults] = useState(INITIAL_PRODUCTS);
 
-  useEffect(() => {
-    if (!search.trim()) {
-      setSearchResults([]);
-    } else {
-      const q = search.toLowerCase();
-      const filtered = INITIAL_PRODUCTS.filter(
-        (p) =>
+  // Derived search results without cascading effect
+  const searchResults = search.trim()
+    ? INITIAL_PRODUCTS.filter((p) => {
+        const q = search.toLowerCase();
+        return (
           p.name.toLowerCase().includes(q) ||
           p.category.toLowerCase().includes(q) ||
           p.shortDescription.toLowerCase().includes(q)
-      );
-      setSearchResults(filtered);
-    }
-  }, [search]);
+        );
+      })
+    : [];
 
-  // Close menus on route change
-  useEffect(() => {
-    setMenuOpen(false);
-    setSearchOpen(false);
-    setUserDropdownOpen(false);
-  }, [pathname]);
+
 
   const navLinks = [
     { name: "Home", href: "/" },
@@ -80,10 +72,14 @@ export default function Header() {
             className="flex min-w-0 items-center gap-2 overflow-hidden focus:outline-none"
             aria-label="Palletoori's Dairy Farm Home"
           >
-            <img
+            <Image
               src="/logo.png"
               alt="Palletoori's Dairy Farm"
+              width={230}
+              height={60}
               className="block h-auto w-[150px] max-w-full object-contain sm:w-[195px] lg:w-[230px]"
+              style={{ height: 'auto' }}
+              priority
             />
           </Link>
 
@@ -265,9 +261,11 @@ export default function Header() {
                         className="flex items-center justify-between rounded-xl p-2.5 transition hover:bg-[#f8efd9]"
                       >
                         <div className="flex items-center gap-3">
-                          <img
+                          <Image
                             src={product.image}
                             alt={product.name}
+                            width={40}
+                            height={40}
                             className="h-10 w-10 rounded-lg object-contain bg-white p-1"
                           />
                           <div>

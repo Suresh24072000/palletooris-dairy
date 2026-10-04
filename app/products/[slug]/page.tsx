@@ -1,7 +1,8 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -18,8 +19,6 @@ import {
   ShoppingCart,
   Calendar,
   Check,
-  ArrowLeft,
-  Clock,
 } from "lucide-react";
 
 export default function ProductDetailPage({
@@ -38,12 +37,6 @@ export default function ProductDetailPage({
   const [selectedVariant, setSelectedVariant] = useState(product.variants[0]);
   const [quantity, setQuantity] = useState(1);
   const [isAdded, setIsAdded] = useState(false);
-
-  useEffect(() => {
-    if (product && product.variants.length > 0) {
-      setSelectedVariant(product.variants[0]);
-    }
-  }, [product]);
 
   const handleAddToCart = () => {
     addToCart({
@@ -117,10 +110,13 @@ export default function ProductDetailPage({
           {/* LEFT: LARGE PRODUCT IMAGE */}
           <div className="flex flex-col items-center">
             <div className="relative w-full aspect-square max-w-[500px] overflow-hidden rounded-[32px] bg-[#f8efd9] p-8 shadow-sm flex items-center justify-center">
-              <img
+              <Image
                 src={product.image}
                 alt={product.name}
+                width={500}
+                height={500}
                 className="max-h-full max-w-full object-contain drop-shadow-xl"
+                priority
               />
               {product.isFeatured && (
                 <div className="absolute top-4 left-4 inline-flex items-center gap-1 rounded-full bg-[#126044] px-3 py-1.5 text-xs font-bold text-white shadow">
