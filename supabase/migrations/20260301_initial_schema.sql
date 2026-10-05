@@ -261,22 +261,91 @@ ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_variants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.delivery_slots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.deliveries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inventory ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
--- Public can view active products, categories, variants, and delivery slots
+-- Security helper function to verify administrator status
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM public.profiles
+        WHERE id = auth.uid()
+        AND role IN ('admin', 'super_admin', 'farm_manager', 'operations', 'delivery_manager', 'inventory_manager', 'support')
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Public can view active catalog items
 CREATE POLICY "Public can view active products" ON public.products FOR SELECT USING (is_active = true);
 CREATE POLICY "Public can view categories" ON public.categories FOR SELECT USING (true);
 CREATE POLICY "Public can view product variants" ON public.product_variants FOR SELECT USING (is_available = true);
 CREATE POLICY "Public can view delivery slots" ON public.delivery_slots FOR SELECT USING (is_active = true);
+CREATE POLICY "Public can view active coupons" ON public.coupons FOR SELECT USING (is_active = true);
 
--- Users can view & update their own profile
-CREATE POLICY "Users can manage own profile" ON public.profiles FOR ALL USING (auth.uid() = id);
+-- Profiles: Users can view & update their own profile (cannot elevate their own role)
+CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id AND role = 'customer');
+CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id AND role = 'customer');
 
--- Users can manage their own addresses
+-- Addresses: Users can manage their own addresses
 CREATE POLICY "Users can manage own addresses" ON public.addresses FOR ALL USING (auth.uid() = user_id);
 
--- Users can view their own orders
+-- Orders: Users can view and create their own orders
 CREATE POLICY "Users can view own orders" ON public.orders FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert own orders" ON public.orders FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Users can view their own subscriptions
+-- Order Items: Users can view and insert their own order items
+CREATE POLICY "Users can view own order items" ON public.order_items FOR SELECT USING (
+    EXISTS (
+        SELECT 1 FROM public.orders
+        WHERE orders.id = order_items.order_id
+        AND orders.user_id = auth.uid()
+    )
+);
+CREATE POLICY "Users can insert own order items" ON public.order_items FOR INSERT WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM public.orders
+        WHERE orders.id = order_items.order_id
+        AND orders.user_id = auth.uid()
+    )
+);
+
+-- Subscriptions: Users can view and manage their own subscriptions
 CREATE POLICY "Users can manage own subscriptions" ON public.subscriptions FOR ALL USING (auth.uid() = user_id);
+
+-- Notifications: Users can view and update their own notifications
+CREATE POLICY "Users can view own notifications" ON public.notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can update own notifications" ON public.notifications FOR UPDATE USING (auth.uid() = user_id);
+
+-- Payments: Users can view payments for their own orders
+CREATE POLICY "Users can view own payments" ON public.payments FOR SELECT USING (
+    EXISTS (
+        SELECT 1 FROM public.orders
+        WHERE orders.id = payments.order_id
+        AND orders.user_id = auth.uid()
+    )
+);
+
+-- ========================================================
+-- ADMINISTRATOR FULL ACCESS POLICIES
+-- ========================================================
+CREATE POLICY "Admins can manage products" ON public.products FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can manage product variants" ON public.product_variants FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can manage categories" ON public.categories FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can manage inventory" ON public.inventory FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can manage coupons" ON public.coupons FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can manage delivery slots" ON public.delivery_slots FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can manage all orders" ON public.orders FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can manage all order items" ON public.order_items FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can manage all subscriptions" ON public.subscriptions FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can manage deliveries" ON public.deliveries FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can manage admin users" ON public.admin_users FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can view all profiles" ON public.profiles FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can view all payments" ON public.payments FOR ALL USING (public.is_admin());
+CREATE POLICY "Admins can manage notifications" ON public.notifications FOR ALL USING (public.is_admin());
+

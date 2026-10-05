@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -35,6 +35,16 @@ import {
   LogOut,
 } from "lucide-react";
 
+const ADMIN_ROLES = [
+  "admin",
+  "super_admin",
+  "farm_manager",
+  "operations",
+  "delivery_manager",
+  "inventory_manager",
+  "support",
+];
+
 type AdminTab =
   | "overview"
   | "products"
@@ -49,6 +59,68 @@ export default function AdminDashboardPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [authChecking, setAuthChecking] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function verifyAdminAuth() {
+      const isDevBypassAllowed =
+        process.env.NODE_ENV !== "production" &&
+        (process.env.ALLOW_DEV_ADMIN_BYPASS === "true" ||
+          process.env.NEXT_PUBLIC_ALLOW_DEV_ADMIN_BYPASS === "true");
+
+      if (!isSupabaseConfigured()) {
+        const hasDevCookie =
+          typeof document !== "undefined" &&
+          document.cookie
+            .split("; ")
+            .some((c) => c.startsWith("dev_admin_session=authenticated"));
+
+        if (!hasDevCookie && !isDevBypassAllowed) {
+          router.replace("/admin/login");
+          return;
+        }
+        if (mounted) setAuthChecking(false);
+        return;
+      }
+
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession();
+
+        if (error || !session?.user) {
+          router.replace("/admin/login");
+          return;
+        }
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .single();
+
+        if (!profile?.role || !ADMIN_ROLES.includes(profile.role)) {
+          await supabase.auth.signOut();
+          router.replace("/admin/login?error=access_denied");
+          return;
+        }
+
+        if (mounted) setAuthChecking(false);
+      } catch (err) {
+        console.warn("Admin authorization check error:", err);
+        router.replace("/admin/login");
+      }
+    }
+
+    verifyAdminAuth();
+
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
 
   const handleAdminLogout = async () => {
     if (isSupabaseConfigured()) {
@@ -248,6 +320,17 @@ export default function AdminDashboardPage() {
       .filter((v) => v.stock <= 40)
       .map((v) => ({ product: p, variant: v }))
   );
+
+  if (authChecking) {
+    return (
+      <div className="min-h-screen bg-[#173b27] flex items-center justify-center p-6 text-white text-center">
+        <div>
+          <div className="w-12 h-12 border-4 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="font-bold text-sm tracking-wide">Verifying Administrator Authorization...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#f4efe4] flex flex-col md:flex-row text-[#173b27]">

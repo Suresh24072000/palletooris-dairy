@@ -6,17 +6,22 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/lib/context/AuthContext";
-import { ArrowRight, AlertCircle } from "lucide-react";
+import { ArrowRight, AlertCircle, Phone, Lock } from "lucide-react";
+
+// TODO: Enable production SMS OTP after Twilio/alternative SMS provider configuration is completed.
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextParam = searchParams.get("next");
-  const { sendOtp, verifyOtp } = useAuth();
+  const { sendOtp, verifyOtp, signInWithEmail } = useAuth();
 
+  const [authMode, setAuthMode] = useState<"phone" | "email">("phone");
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [infoMsg, setInfoMsg] = useState("");
@@ -63,6 +68,27 @@ function LoginForm() {
     }
   };
 
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg("");
+    setInfoMsg("");
+
+    if (!email || !password) {
+      setErrorMsg("Please enter your email and password.");
+      return;
+    }
+
+    setLoading(true);
+    const res = await signInWithEmail(email, password);
+    setLoading(false);
+
+    if (res.success) {
+      router.push(nextParam || "/profile");
+    } else {
+      setErrorMsg(res.message);
+    }
+  };
+
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#fffdf8] flex flex-col justify-between">
       <Header />
@@ -78,13 +104,51 @@ function LoginForm() {
               />
             </Link>
             <h1 className="text-2xl font-black text-[#173b27]">
-              {step === "phone" ? "Login to Palletoori's" : "Verify Mobile Number"}
+              {authMode === "email"
+                ? "Sign in with Email"
+                : step === "phone"
+                ? "Login to Palletoori's"
+                : "Verify Mobile Number"}
             </h1>
             <p className="mt-1 text-xs text-[#52665d]">
-              {step === "phone"
+              {authMode === "email"
+                ? "Enter your account email and password to access your profile and orders"
+                : step === "phone"
                 ? "Enter your mobile number to view orders, daily milk subscriptions & addresses"
                 : `Enter the 6-digit verification code sent to +91 ${phone.slice(-10)}`}
             </p>
+          </div>
+
+          {/* Mode Switcher */}
+          <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-2xl">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("phone");
+                setErrorMsg("");
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition ${
+                authMode === "phone"
+                  ? "bg-white text-[#173b27] shadow"
+                  : "text-gray-500 hover:text-black"
+              }`}
+            >
+              <Phone size={14} /> Mobile Number
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode("email");
+                setErrorMsg("");
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-bold transition ${
+                authMode === "email"
+                  ? "bg-white text-[#173b27] shadow"
+                  : "text-gray-500 hover:text-black"
+              }`}
+            >
+              <Lock size={14} /> Email & Password
+            </button>
           </div>
 
           {errorMsg && (
@@ -100,7 +164,45 @@ function LoginForm() {
             </div>
           )}
 
-          {step === "phone" ? (
+          {authMode === "email" ? (
+            <form onSubmit={handleEmailLogin} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="customer@example.com"
+                  className="w-full rounded-2xl border border-black/10 bg-[#fffdf8] px-4 py-3 text-sm text-[#173b27] outline-none focus:border-[#126044]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full rounded-2xl border border-black/10 bg-[#fffdf8] px-4 py-3 text-sm text-[#173b27] outline-none focus:border-[#126044]"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#126044] text-sm font-bold text-white shadow-md transition hover:bg-[#0e5039] disabled:opacity-50"
+              >
+                {loading ? "Signing in..." : "Sign In with Email"} <ArrowRight size={16} />
+              </button>
+            </form>
+          ) : step === "phone" ? (
             <form onSubmit={handleSendOtp} className="space-y-4">
               <div>
                 <label className="text-xs font-bold text-gray-700 block mb-1">
@@ -150,9 +252,11 @@ function LoginForm() {
                   className="w-full rounded-2xl border border-black/10 bg-[#fffdf8] p-3 text-center text-lg font-black tracking-widest text-[#173b27] outline-none focus:border-[#126044]"
                   autoFocus
                 />
-                <p className="text-[10px] text-gray-400 text-center mt-1">
-                  Development test code: <strong className="text-gray-600">123456</strong>
-                </p>
+                {process.env.NODE_ENV === "development" && (
+                  <p className="text-[10px] text-gray-400 text-center mt-1">
+                    Development test code: <strong className="text-gray-600">123456</strong>
+                  </p>
+                )}
               </div>
 
               <button

@@ -69,13 +69,16 @@ export async function POST(req: NextRequest) {
         subtotal += variant.price * quantity;
       }
 
-      // Delivery rule: Free delivery for orders >= ₹500, else ₹40
-      const deliveryFee = subtotal >= 500 ? 0 : 40;
+      // Delivery rule: Free delivery for orders >= ₹199, else ₹25 (consistent with CartContext & orders.ts)
+      const deliveryFee = subtotal >= 199 ? 0 : 25;
 
       // Coupon discount verification
       let discount = 0;
-      if (couponCode === "PALLETOORI50" && subtotal >= 200) {
+      const normalizedCoupon = (couponCode || "").trim().toUpperCase();
+      if (normalizedCoupon === "PALLETOORI50" && subtotal >= 200) {
         discount = 50;
+      } else if (normalizedCoupon === "FARM20") {
+        discount = Math.round(subtotal * 0.2);
       }
 
       validatedTotal = Math.max(1, subtotal + deliveryFee - discount);

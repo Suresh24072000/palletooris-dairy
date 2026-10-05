@@ -27,6 +27,7 @@ export interface AuthContextType {
   isLoading: boolean;
   sendOtp: (phone: string) => Promise<{ success: boolean; message: string }>;
   verifyOtp: (phone: string, otp: string) => Promise<{ success: boolean; message: string }>;
+  signInWithEmail: (email: string, pass: string) => Promise<{ success: boolean; message: string }>;
   updateProfile: (data: { fullName?: string; full_name?: string; email?: string; avatar_url?: string }) => Promise<{ success: boolean; message: string }>;
   addAddress: (address: Omit<Address, "id">) => Promise<{ success: boolean; message: string }>;
   deleteAddress: (id: string) => Promise<{ success: boolean; message: string }>;
@@ -217,6 +218,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     // Offline / fallback dev mode: state already initialized via lazy useState
   }, [fetchProfile, fetchAddresses, syncCustomerUser]);
+
+  // TODO: Enable production SMS OTP after Twilio/alternative SMS provider configuration is completed.
+  const signInWithEmail = async (
+    email: string,
+    pass: string
+  ): Promise<{ success: boolean; message: string }> => {
+    if (!email || !pass) {
+      return { success: false, message: "Please enter your email and password." };
+    }
+
+    if (!isSupabaseConfigured()) {
+      if (process.env.NODE_ENV === "production") {
+        return { success: false, message: "Authentication service is not configured." };
+      }
+      const localUser = DairyStore.getUser();
+      localUser.email = email.trim();
+      DairyStore.saveUser(localUser);
+      setUser(localUser);
+      return { success: true, message: "Signed in successfully!" };
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: pass,
+      });
+
+      if (error || !data.user) {
+        return { success: false, message: "Unable to sign in. Please check your email and password." };
+      }
+
+      await refreshProfile();
+      return { success: true, message: "Signed in successfully!" };
+    } catch {
+      return { success: false, message: "Unable to connect to authentication service." };
+    }
+  };
 
   const sendOtp = async (phone: string): Promise<{ success: boolean; message: string }> => {
     const cleanPhone = phone.trim().replace(/\D/g, "").slice(-10);
@@ -473,6 +511,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         sendOtp,
         verifyOtp,
+        signInWithEmail,
         updateProfile,
         addAddress,
         deleteAddress,

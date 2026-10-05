@@ -62,7 +62,8 @@ export async function proxy(request: NextRequest) {
 
   const isDevBypassAllowed =
     process.env.NODE_ENV !== "production" &&
-    process.env.ALLOW_DEV_ADMIN_BYPASS === "true";
+    (process.env.ALLOW_DEV_ADMIN_BYPASS === "true" ||
+      process.env.NEXT_PUBLIC_ALLOW_DEV_ADMIN_BYPASS === "true");
 
   // If Supabase is not configured:
   if (!isConfigured) {

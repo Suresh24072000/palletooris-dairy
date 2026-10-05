@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/lib/context/AuthContext";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { DairyStore } from "@/lib/db/store";
 import { Address } from "@/types/dairy";
 import {
@@ -20,11 +21,19 @@ import {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, updateProfile, addAddress, deleteAddress, logout } = useAuth();
+  const { user, updateProfile, addAddress, deleteAddress, logout, isAuthenticated, isLoading } = useAuth();
 
   const [isEditing, setIsEditing] = useState(false);
   const [fullName, setFullName] = useState(user?.fullName || "");
   const [email, setEmail] = useState(user?.email || "");
+  const [saveMsg, setSaveMsg] = useState("");
+
+  // Auth guard: redirect unauthenticated users to login when Supabase is configured
+  useEffect(() => {
+    if (!isLoading && isSupabaseConfigured() && !isAuthenticated) {
+      router.replace("/login?next=/profile");
+    }
+  }, [isLoading, isAuthenticated, router]);
 
   // Address Modal
   const [showAddressModal, setShowAddressModal] = useState(false);
@@ -44,15 +53,17 @@ export default function ProfilePage() {
   const orders = DairyStore.getOrders();
   const subscriptions = DairyStore.getSubscriptions();
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateProfile({ fullName, email });
+    await updateProfile({ fullName, email });
     setIsEditing(false);
+    setSaveMsg("Profile updated successfully!");
+    setTimeout(() => setSaveMsg(""), 3000);
   };
 
-  const handleAddAddressSubmit = (e: React.FormEvent) => {
+  const handleAddAddressSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addAddress(newAddress);
+    await addAddress(newAddress);
     setShowAddressModal(false);
     setNewAddress({
       fullName: user?.fullName || "",
@@ -67,6 +78,18 @@ export default function ProfilePage() {
       instructions: "",
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen w-full overflow-x-hidden bg-[#fffdf8] flex flex-col justify-between">
+        <Header />
+        <div className="flex-1 flex items-center justify-center p-8">
+          <p className="text-base text-gray-500 font-semibold animate-pulse">Loading your profile...</p>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full overflow-x-hidden bg-[#fffdf8] flex flex-col justify-between">
@@ -93,6 +116,12 @@ export default function ProfilePage() {
             <LogOut size={14} /> Logout
           </button>
         </div>
+
+        {saveMsg && (
+          <div className="mb-6 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3 text-sm font-semibold text-emerald-800 flex items-center gap-2">
+            ✅ {saveMsg}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* LEFT COLUMN: PERSONAL INFO & QUICK STATS */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -32,6 +32,32 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const userDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close menus when route changes
+  useEffect(() => {
+    setSearchOpen(false);
+    setMenuOpen(false);
+    setUserDropdownOpen(false);
+  }, [pathname]);
+
+  // Click outside to close user dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        userDropdownRef.current &&
+        !userDropdownRef.current.contains(event.target as Node)
+      ) {
+        setUserDropdownOpen(false);
+      }
+    };
+    if (userDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [userDropdownOpen]);
 
   // Derived search results without cascading effect
   const searchResults = search.trim()
@@ -45,8 +71,6 @@ export default function Header() {
       })
     : [];
 
-
-
   const navLinks = [
     { name: "Home", href: "/" },
     { name: "Products", href: "/products" },
@@ -59,17 +83,17 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 w-full bg-[#fffdf8] shadow-sm">
       {/* ANNOUNCEMENT */}
-      <div className="w-full bg-[#173b27] px-3 py-2 text-center text-[12px] font-medium text-white sm:px-4 sm:text-sm tracking-wide">
+      <div className="w-full bg-[#173b27] px-3 py-2 text-center text-[11px] sm:text-sm font-medium text-white sm:px-4 tracking-wide">
         🌿 Farm fresh dairy delivered to your doorstep daily before 9 AM
       </div>
 
       {/* MAIN HEADER BAR */}
       <div className="w-full border-b border-black/5 bg-[#fffdf8]">
-        <div className="mx-auto flex h-[76px] w-full max-w-7xl items-center justify-between px-4 sm:h-20 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-[72px] sm:h-20 w-full max-w-7xl items-center justify-between px-2.5 min-[360px]:px-4 sm:px-6 lg:px-8">
           {/* LOGO */}
           <Link
             href="/"
-            className="flex min-w-0 items-center gap-2 overflow-hidden focus:outline-none"
+            className="flex min-w-0 items-center gap-1.5 overflow-hidden focus:outline-none shrink"
             aria-label="Palletoori's Dairy Farm Home"
           >
             <Image
@@ -77,8 +101,8 @@ export default function Header() {
               alt="Palletoori's Dairy Farm"
               width={230}
               height={60}
-              className="block h-auto w-[150px] max-w-full object-contain sm:w-[195px] lg:w-[230px]"
-              style={{ height: 'auto' }}
+              className="block h-auto w-[115px] min-[360px]:w-[138px] sm:w-[195px] lg:w-[230px] max-w-full object-contain"
+              style={{ height: "auto" }}
               priority
             />
           </Link>
@@ -103,36 +127,41 @@ export default function Header() {
             })}
           </nav>
 
-          {/* ACTION BUTTONS */}
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {/* ACTION BUTTONS (MOBILE & DESKTOP) */}
+          <div className="flex shrink-0 items-center gap-1.5 min-[360px]:gap-2 sm:gap-3">
             {/* SEARCH TOGGLE */}
             <button
               type="button"
               onClick={() => setSearchOpen(!searchOpen)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-[#173b27] shadow-sm transition hover:bg-[#f8efd9] focus:outline-none sm:h-11 sm:w-11"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-[#173b27] shadow-sm transition hover:bg-[#f8efd9] focus:outline-none touch-manipulation"
               aria-label="Search products"
             >
-              <Search size={19} />
+              <Search size={18} />
             </button>
 
-            {/* USER / ACCOUNT */}
-            <div className="relative">
+            {/* USER / PROFILE ACCOUNT (VISIBLE AT ALL BREAKPOINTS) */}
+            <div className="relative" ref={userDropdownRef}>
               <button
                 type="button"
                 onClick={() => {
                   if (!isAuthenticated) {
                     router.push("/login");
                   } else {
-                    setUserDropdownOpen(!userDropdownOpen);
+                    // On mobile screens, navigate directly to profile
+                    if (typeof window !== "undefined" && window.innerWidth < 640) {
+                      router.push("/profile");
+                    } else {
+                      setUserDropdownOpen(!userDropdownOpen);
+                    }
                   }
                 }}
-                className="hidden sm:flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-[#173b27] shadow-sm transition hover:bg-[#f8efd9] focus:outline-none sm:h-11 sm:w-11"
-                aria-label="Account"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-[#173b27] shadow-sm transition hover:bg-[#f8efd9] focus:outline-none touch-manipulation"
+                aria-label={isAuthenticated ? "Account: View profile and orders" : "Account: Login or sign up"}
               >
                 <User size={19} />
               </button>
 
-              {/* User Dropdown */}
+              {/* User Dropdown for Desktop */}
               {userDropdownOpen && isAuthenticated && (
                 <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-black/10 bg-white p-2 shadow-xl z-50">
                   <div className="border-b border-black/5 px-3 py-2">
@@ -177,6 +206,7 @@ export default function Header() {
                   </div>
                   <div className="border-t border-black/5 pt-1">
                     <button
+                      type="button"
                       onClick={() => {
                         logout();
                         setUserDropdownOpen(false);
@@ -194,7 +224,7 @@ export default function Header() {
             {/* CART BUTTON */}
             <Link
               href="/cart"
-              className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#173b27] text-white shadow-sm transition hover:bg-[#126044] focus:outline-none sm:h-11 sm:w-11"
+              className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#173b27] text-white shadow-sm transition hover:bg-[#126044] focus:outline-none touch-manipulation"
               aria-label={`Shopping cart with ${totalCount} items`}
             >
               <ShoppingCart size={18} />
@@ -209,7 +239,7 @@ export default function Header() {
             <button
               type="button"
               onClick={() => setMenuOpen(!menuOpen)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-[#173b27] shadow-sm transition lg:hidden hover:bg-[#f8efd9] focus:outline-none sm:h-11 sm:w-11"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-[#173b27] shadow-sm transition lg:hidden hover:bg-[#f8efd9] focus:outline-none touch-manipulation"
               aria-label="Toggle navigation menu"
             >
               {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -341,26 +371,38 @@ export default function Header() {
 
             <div className="mt-2 flex flex-col gap-2">
               {isAuthenticated ? (
-                <div className="rounded-2xl border border-black/10 bg-white p-3 flex items-center justify-between">
-                  <div className="min-w-0">
-                    <p className="text-xs text-gray-500 font-medium">Logged in</p>
-                    <p className="text-sm font-bold text-[#173b27] truncate">
-                      {user?.fullName || `+91 ${user?.phone}`}
-                    </p>
+                <div className="rounded-2xl border border-black/10 bg-white p-3.5 flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-500 font-medium">Logged in as</p>
+                      <p className="text-sm font-bold text-[#173b27] truncate">
+                        {user?.fullName || `+91 ${user?.phone}`}
+                      </p>
+                    </div>
+                    <Link
+                      href="/profile"
+                      onClick={() => setMenuOpen(false)}
+                      className="rounded-full bg-[#173b27] px-4 py-2 text-xs font-bold text-white min-h-[44px] inline-flex items-center justify-center hover:bg-[#126044]"
+                    >
+                      View Profile
+                    </Link>
                   </div>
-                  <Link
-                    href="/profile"
-                    onClick={() => setMenuOpen(false)}
-                    className="rounded-full bg-[#173b27] px-3 py-1.5 text-xs font-bold text-white"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      logout();
+                      setMenuOpen(false);
+                    }}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 min-h-[44px]"
                   >
-                    Profile
-                  </Link>
+                    <LogOut size={14} /> Sign Out
+                  </button>
                 </div>
               ) : (
                 <Link
                   href="/login"
                   onClick={() => setMenuOpen(false)}
-                  className="flex h-12 w-full items-center justify-center rounded-2xl bg-[#126044] font-bold text-white transition hover:bg-[#0e5039]"
+                  className="flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-[#126044] font-bold text-white transition hover:bg-[#0e5039]"
                 >
                   Login / Sign Up with Mobile
                 </Link>

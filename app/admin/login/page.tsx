@@ -18,7 +18,7 @@ const ADMIN_ROLES = [
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState<"phone" | "otp" | "email">("phone");
+  const [step, setStep] = useState<"phone" | "otp" | "email">("email");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,7 +35,7 @@ export default function AdminLoginPage() {
   });
   const [infoMsg, setInfoMsg] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loginMode, setLoginMode] = useState<"phone" | "email">("phone");
+  const [loginMode, setLoginMode] = useState<"phone" | "email">("email");
   const [countdown, setCountdown] = useState(0);
 
   const isDevBypassEnabled =
@@ -102,7 +102,7 @@ export default function AdminLoginPage() {
 
     if (!isSupabaseConfigured()) {
       if (!isDevBypassEnabled) {
-        setErrorMsg("Supabase is not configured. Live credentials must be set in environment variables to send SMS OTP.");
+        setErrorMsg("Phone OTP is temporarily unavailable. Please use email and password.");
         return;
       }
       setInfoMsg(`Local Development Mode: SMS simulation active for +91 ${cleanPhone}. Enter code 123456 below.`);
@@ -118,20 +118,14 @@ export default function AdminLoginPage() {
       });
 
       if (error) {
-        if (error.message.toLowerCase().includes("sms provider") || error.message.toLowerCase().includes("not configured")) {
-          setErrorMsg("Supabase SMS provider not yet configured in project dashboard (Twilio/MessageBird required). Please configure in Supabase Auth Settings or use Email/Password login.");
-        } else if (error.message.toLowerCase().includes("rate limit") || error.message.toLowerCase().includes("too many")) {
-          setErrorMsg("Rate limit reached for OTP. Please wait 5 minutes before trying again.");
-        } else {
-          setErrorMsg(error.message || "Failed to send OTP. Please try again.");
-        }
+        setErrorMsg("Phone OTP is temporarily unavailable. Please use email and password.");
       } else {
         setInfoMsg(`OTP sent successfully to +91 ${cleanPhone}`);
         setStep("otp");
         setCountdown(30);
       }
     } catch {
-      setErrorMsg("Network error occurred while sending OTP. Please check your connection.");
+      setErrorMsg("Phone OTP is temporarily unavailable. Please use email and password.");
     } finally {
       setLoading(false);
     }
@@ -208,7 +202,7 @@ export default function AdminLoginPage() {
     setErrorMsg("");
 
     if (!email || !password) {
-      setErrorMsg("Please enter your email and password.");
+      setErrorMsg("Please enter your admin email and password.");
       return;
     }
 
@@ -235,19 +229,19 @@ export default function AdminLoginPage() {
       });
 
       if (error || !data.user) {
-        setErrorMsg(error?.message || "Invalid admin credentials.");
+        setErrorMsg("Unable to sign in. Please check your email and password.");
         setLoading(false);
         return;
       }
 
-      // Verify admin role
-      const { data: profile } = await supabase
+      // Verify admin role from database profiles table
+      const { data: profile, error: profError } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", data.user.id)
         .single();
 
-      if (!profile?.role || !ADMIN_ROLES.includes(profile.role)) {
+      if (profError || !profile?.role || !ADMIN_ROLES.includes(profile.role)) {
         await supabase.auth.signOut();
         setErrorMsg("Access Denied: You do not have administrator authorization.");
         setLoading(false);
@@ -257,7 +251,7 @@ export default function AdminLoginPage() {
       setAdminCookie();
       router.push("/admin");
     } catch {
-      setErrorMsg("Login failed. Please verify your credentials and try again.");
+      setErrorMsg("Unable to sign in. Please check your network connection and credentials.");
     } finally {
       setLoading(false);
     }
@@ -290,6 +284,20 @@ export default function AdminLoginPage() {
             <button
               type="button"
               onClick={() => {
+                setLoginMode("email");
+                setErrorMsg("");
+              }}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition ${
+                loginMode === "email"
+                  ? "bg-white text-[#173b27] shadow"
+                  : "text-white/70 hover:text-white"
+              }`}
+            >
+              <Lock size={14} /> Email & Password
+            </button>
+            <button
+              type="button"
+              onClick={() => {
                 setLoginMode("phone");
                 setStep("phone");
                 setErrorMsg("");
@@ -301,20 +309,6 @@ export default function AdminLoginPage() {
               }`}
             >
               <Phone size={14} /> Phone OTP
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setLoginMode("email");
-                setErrorMsg("");
-              }}
-              className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-bold transition ${
-                loginMode === "email"
-                  ? "bg-white text-[#173b27] shadow"
-                  : "text-white/70 hover:text-white"
-              }`}
-            >
-              <Lock size={14} /> Email Password
             </button>
           </div>
 
@@ -361,6 +355,30 @@ export default function AdminLoginPage() {
 
           {loginMode === "phone" ? (
             <>
+              <div className="mb-4 rounded-2xl bg-amber-500/15 border border-amber-400/30 p-3.5 text-xs text-amber-200">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle size={16} className="shrink-0 text-amber-400 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-amber-100">
+                      Phone OTP is temporarily unavailable. Please use email and password.
+                    </p>
+                    <p className="mt-1 text-amber-200/80 leading-relaxed text-[11px]">
+                      SMS OTP is currently disabled while SMS gateway credentials are being configured. Please sign in using your administrator email and password.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoginMode("email");
+                        setErrorMsg("");
+                      }}
+                      className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-[#c77828] px-3 py-1.5 text-[11px] font-bold text-white hover:bg-[#b86e22] shadow transition"
+                    >
+                      <Lock size={12} /> Switch to Email &amp; Password
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               {step === "phone" && (
                 <form onSubmit={handleSendOtp} className="space-y-4">
                   <div>
