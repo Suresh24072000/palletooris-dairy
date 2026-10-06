@@ -14,6 +14,7 @@ import {
   Phone,
   Download,
 } from "lucide-react";
+import { FARM_CONTACT } from "@/lib/config/contact";
 
 export default function OrderDetailsPage({
   params,
@@ -243,10 +244,10 @@ export default function OrderDetailsPage({
               <p className="font-bold text-[#173b27] mb-1">Need help with this order?</p>
               <p>Our dispatch manager is available from 5:00 AM to 9:00 PM.</p>
               <a
-                href="tel:+919876543210"
+                href={FARM_CONTACT.TEL_HREF}
                 className="mt-2 inline-flex items-center gap-1.5 font-bold text-[#126044] hover:underline"
               >
-                <Phone size={14} /> Call Farm Desk: +91 98765 43210
+                <Phone size={14} /> Call Farm Desk: {FARM_CONTACT.PHONE_DISPLAY}
               </a>
             </div>
           </div>

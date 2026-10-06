@@ -4,6 +4,7 @@ import { useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Phone, MapPin, Clock, CheckCircle2, Send } from "lucide-react";
+import { FARM_CONTACT } from "@/lib/config/contact";
 
 export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
@@ -57,7 +58,7 @@ export default function ContactPage() {
               <div>
                 <h3 className="text-base font-bold text-[#173b27]">Farm Location</h3>
                 <p className="mt-1 text-sm text-[#52665d]">
-                  Palletoori&apos;s Dairy Farm, Survey No. 84, Shamshabad Rural, Hyderabad, Telangana 501218
+                  {FARM_CONTACT.ADDRESS}
                 </p>
                 <p className="mt-1 text-xs text-gray-400">Visitors welcome on weekends with prior appointment.</p>
               </div>
@@ -70,11 +71,11 @@ export default function ContactPage() {
               <div>
                 <h3 className="text-base font-bold text-[#173b27]">Phone &amp; WhatsApp</h3>
                 <p className="mt-1 text-sm text-[#52665d]">
-                  Dispatch Desk: <a href="tel:+919876543210" className="font-bold text-[#173b27] hover:underline">+91 98765 43210</a>
+                  Dispatch Desk: <a href={FARM_CONTACT.TEL_HREF} className="font-bold text-[#173b27] hover:underline">{FARM_CONTACT.PHONE_DISPLAY}</a>
                 </p>
                 <div className="mt-3">
                   <a
-                    href="https://wa.me/919876543210?text=Hello%20Palletoori's%20Dairy%20Farm,%20I%20have%20an%20inquiry."
+                    href={FARM_CONTACT.WHATSAPP_INQUIRY_URL}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 rounded-full bg-[#126044] px-4 py-2 text-xs font-bold text-white shadow hover:bg-[#0e5039]"
@@ -147,7 +148,7 @@ export default function ContactPage() {
                       required
                       value={form.phone}
                       onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                      placeholder="9876543210"
+                      placeholder="7286813661"
                       className="w-full rounded-2xl border border-black/10 bg-[#fffdf8] p-3 text-xs outline-none focus:border-[#126044]"
                     />
                   </div>

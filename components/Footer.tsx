@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ShieldCheck, Truck, Clock, Sparkles, Phone, Mail, MapPin } from "lucide-react";
+import { FARM_CONTACT } from "@/lib/config/contact";
 
 export default function Footer() {
   return (
@@ -151,22 +152,22 @@ export default function Footer() {
             <div className="space-y-3 text-sm text-[#52665d]">
               <div className="flex items-start gap-2.5">
                 <MapPin size={18} className="shrink-0 text-[#b77932] mt-0.5" />
-                <span>Palletoori&apos;s Dairy Farm, Shamshabad Rural, Hyderabad, Telangana 501218</span>
+                <span>{FARM_CONTACT.ADDRESS}</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Phone size={16} className="shrink-0 text-[#b77932]" />
-                <a href="tel:+919876543210" className="hover:text-[#173b27] font-semibold">
-                  +91 98765 43210
+                <a href={FARM_CONTACT.TEL_HREF} className="hover:text-[#173b27] font-semibold">
+                  {FARM_CONTACT.PHONE_DISPLAY}
                 </a>
               </div>
               <div className="flex items-center gap-2.5">
                 <Mail size={16} className="shrink-0 text-[#b77932]" />
-                <a href="mailto:contact@palletoorisdairy.com" className="hover:text-[#173b27]">
-                  contact@palletoorisdairy.com
+                <a href={FARM_CONTACT.MAILTO_HREF} className="hover:text-[#173b27]">
+                  {FARM_CONTACT.EMAIL}
                 </a>
               </div>
               <a
-                href="https://wa.me/919876543210?text=Hello%20Palletoori's%20Dairy%20Farm,%20I%20would%20like%20to%20order%20fresh%20milk."
+                href={FARM_CONTACT.WHATSAPP_ORDER_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-2 inline-flex items-center gap-2 rounded-full bg-[#126044] px-4 py-2 text-xs font-bold text-white shadow transition hover:bg-[#0e5039]"

@@ -142,6 +142,22 @@ export default function CheckoutPage() {
       };
 
   const handlePlaceOrder = async () => {
+    // Guard: Ensure all checkout steps are complete
+    if (step < 4) {
+      setErrorMessage("Please complete all checkout steps before placing your order.");
+      return;
+    }
+    if (!fullName.trim() || phone.replace(/\D/g, "").length < 10) {
+      setErrorMessage("Please enter a valid name and 10-digit mobile number.");
+      setStep(1);
+      return;
+    }
+    if (!activeAddress.houseFlat || !activeAddress.area || !activeAddress.pincode) {
+      setErrorMessage("Please complete your delivery address before continuing.");
+      setStep(2);
+      return;
+    }
+
     setIsProcessing(true);
     setErrorMessage("");
 
@@ -179,6 +195,14 @@ export default function CheckoutPage() {
         const orderData = await createRes.json();
 
         if (!orderData.success) {
+          // Razorpay not configured — guide user to COD gracefully
+          if (orderData.error && (orderData.error.includes("not configured") || createRes.status === 503)) {
+            setErrorMessage(
+              "Online payment is not yet activated. Please select Cash on Delivery to complete your order."
+            );
+            setIsProcessing(false);
+            return;
+          }
           throw new Error(orderData.error || "Unable to initiate payment");
         }
 
@@ -224,16 +248,27 @@ export default function CheckoutPage() {
             theme: {
               color: "#173b27",
             },
+            modal: {
+              ondismiss: () => {
+                // User dismissed the Razorpay modal without completing payment
+                setIsProcessing(false);
+              },
+            },
           };
 
           const rzp = new window.Razorpay(options);
           rzp.on("payment.failed", function (resp: { error: { description: string } }) {
-            setErrorMessage(`Payment failed: ${resp.error.description}`);
+            setErrorMessage(
+              `Payment failed: ${resp.error.description}. Please try again or choose Cash on Delivery.`
+            );
             setIsProcessing(false);
           });
           rzp.open();
+          // isProcessing stays true until handler, ondismiss, or payment.failed fires
         } else {
-          setErrorMessage("Razorpay payment checkout is unavailable. Please check your connection or choose Cash on Delivery.");
+          setErrorMessage(
+            "Razorpay payment checkout is unavailable. Please check your internet connection or choose Cash on Delivery."
+          );
           setIsProcessing(false);
         }
       } else {

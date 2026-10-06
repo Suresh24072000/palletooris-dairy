@@ -21,6 +21,7 @@ import {
 import { useCart } from "@/lib/context/CartContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { INITIAL_PRODUCTS } from "@/lib/data/mockData";
+import { FARM_CONTACT } from "@/lib/config/contact";
 
 export default function Header() {
   const pathname = usePathname();
@@ -28,11 +29,21 @@ export default function Header() {
   const { totalCount } = useCart();
   const { user, isAuthenticated, logout } = useAuth();
 
+  const [mounted, setMounted] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [search, setSearch] = useState("");
   const userDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Prevent SSR/client hydration mismatch for auth-dependent UI
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Derive auth state only after hydration
+  const isLoggedIn = mounted && isAuthenticated;
+  const currentUser = mounted ? user : null;
 
   // Close menus when route changes
   useEffect(() => {
@@ -144,7 +155,7 @@ export default function Header() {
               <button
                 type="button"
                 onClick={() => {
-                  if (!isAuthenticated) {
+                  if (!isLoggedIn) {
                     router.push("/login");
                   } else {
                     // On mobile screens, navigate directly to profile
@@ -156,18 +167,18 @@ export default function Header() {
                   }
                 }}
                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-[#173b27] shadow-sm transition hover:bg-[#f8efd9] focus:outline-none touch-manipulation"
-                aria-label={isAuthenticated ? "Account: View profile and orders" : "Account: Login or sign up"}
+                aria-label="Account"
               >
                 <User size={19} />
               </button>
 
               {/* User Dropdown for Desktop */}
-              {userDropdownOpen && isAuthenticated && (
+              {userDropdownOpen && isLoggedIn && (
                 <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-black/10 bg-white p-2 shadow-xl z-50">
                   <div className="border-b border-black/5 px-3 py-2">
                     <p className="text-xs text-gray-500 font-medium">Logged in as</p>
                     <p className="text-sm font-bold text-[#173b27] truncate">
-                      {user?.fullName || `+91 ${user?.phone}`}
+                      {currentUser?.fullName || `+91 ${currentUser?.phone}`}
                     </p>
                   </div>
                   <div className="py-1">
@@ -370,13 +381,13 @@ export default function Header() {
             </div>
 
             <div className="mt-2 flex flex-col gap-2">
-              {isAuthenticated ? (
+              {isLoggedIn ? (
                 <div className="rounded-2xl border border-black/10 bg-white p-3.5 flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0">
                       <p className="text-xs text-gray-500 font-medium">Logged in as</p>
                       <p className="text-sm font-bold text-[#173b27] truncate">
-                        {user?.fullName || `+91 ${user?.phone}`}
+                        {currentUser?.fullName || `+91 ${currentUser?.phone}`}
                       </p>
                     </div>
                     <Link
@@ -420,10 +431,10 @@ export default function Header() {
 
             <div className="mt-4 flex items-center justify-center gap-4 text-xs text-gray-500">
               <a
-                href="tel:+919876543210"
+                href={FARM_CONTACT.TEL_HREF}
                 className="flex items-center gap-1.5 hover:text-[#173b27]"
               >
-                <Phone size={14} /> +91 98765 43210
+                <Phone size={14} /> {FARM_CONTACT.PHONE_DISPLAY}
               </a>
               <span>•</span>
               <span className="flex items-center gap-1">

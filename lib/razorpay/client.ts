@@ -10,11 +10,15 @@ export const razorpayClient = new Razorpay({
 });
 
 export function isRazorpayConfigured(): boolean {
+  const keyId = process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+  const keySecret = process.env.RAZORPAY_KEY_SECRET;
   return (
-    !!process.env.RAZORPAY_KEY_ID &&
-    process.env.RAZORPAY_KEY_ID !== "rzp_test_placeholder" &&
-    !!process.env.RAZORPAY_KEY_SECRET &&
-    process.env.RAZORPAY_KEY_SECRET !== "placeholder_secret"
+    !!keyId &&
+    keyId !== "rzp_test_placeholder" &&
+    !keyId.includes("your_key") &&
+    !!keySecret &&
+    keySecret !== "placeholder_secret" &&
+    !keySecret.includes("your_")
   );
 }
 
